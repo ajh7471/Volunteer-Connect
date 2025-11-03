@@ -35,7 +35,7 @@ export default function Header() {
 
   return (
     <header className="border-b bg-background">
-      <div className="container mx-auto max-w-6xl flex items-center gap-2 py-3 px-4">
+      <div className="container mx-auto max-w-7xl flex items-center gap-2 py-3 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="mr-4 text-lg font-semibold text-foreground">
           Volunteer Connect
         </Link>
