@@ -34,7 +34,7 @@ export default function RootLayout({
       >
         <ToastProvider>
           <Header />
-          <div className="container max-w-4xl py-6">{children}</div>
+          <div className="container max-w-7xl px-4 sm:px-6 lg:px-8 py-6">{children}</div>
           <Analytics />
         </ToastProvider>
       </body>

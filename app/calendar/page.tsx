@@ -152,15 +152,15 @@ export default function CalendarPage() {
     const slots: Array<Shift["slot"]> = ["AM", "MID", "PM"]
     return (
       <div
-        className={`min-h-32 rounded-lg border p-2 ${inMonth ? "bg-card" : "bg-muted/50 text-muted-foreground"} flex flex-col`}
+        className={`min-h-32 lg:min-h-40 rounded-lg border p-2 lg:p-3 ${inMonth ? "bg-card" : "bg-muted/50 text-muted-foreground"} flex flex-col`}
       >
-        <div className="mb-1 text-xs font-medium">{date.getDate()}</div>
+        <div className="mb-1 text-xs lg:text-sm font-medium">{date.getDate()}</div>
         <div className="mt-auto space-y-1">
           {slots.map((slot) => {
             const s = byDateSlot.get(`${dYMD}_${slot}`)
             if (!s)
               return (
-                <div key={slot} className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                <div key={slot} className="rounded-md bg-muted px-2 py-1 text-xs lg:text-sm text-muted-foreground">
                   No {slot}
                 </div>
               )
@@ -173,7 +173,7 @@ export default function CalendarPage() {
                 onClick={() => (mine ? leave(s) : join(s))}
                 disabled={pending === s.id || (!mine && full)}
                 className={[
-                  "w-full rounded-md px-2 py-1 text-left text-xs transition",
+                  "w-full rounded-md px-2 py-1 lg:py-1.5 text-left text-xs lg:text-sm transition",
                   pending === s.id
                     ? "opacity-60 cursor-wait"
                     : mine
@@ -194,7 +194,7 @@ export default function CalendarPage() {
           })}
           <Link
             href={`/day/${dYMD}`}
-            className="mt-2 block text-center text-xs text-blue-600 hover:text-blue-800 underline"
+            className="mt-2 block text-center text-xs lg:text-sm text-blue-600 hover:text-blue-800 underline"
           >
             View roster
           </Link>
@@ -207,38 +207,40 @@ export default function CalendarPage() {
 
   return (
     <RequireAuth>
-      <main className="space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight">Volunteer Calendar</h1>
-        <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold">
+      <main className="space-y-6">
+        <h1 className="text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight">Volunteer Calendar</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="text-lg lg:text-xl font-semibold">
             {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
           </div>
-          <div className="space-x-2">
-            <Button variant="outline" onClick={() => setMonth(addMonths(month, -1))}>
+          <div className="flex gap-2">
+            <Button variant="outline" size="default" onClick={() => setMonth(addMonths(month, -1))}>
               Prev
             </Button>
-            <Button variant="outline" onClick={() => setMonth(startOfMonth(new Date()))}>
+            <Button variant="outline" size="default" onClick={() => setMonth(startOfMonth(new Date()))}>
               Today
             </Button>
-            <Button variant="outline" onClick={() => setMonth(addMonths(month, 1))}>
+            <Button variant="outline" size="default" onClick={() => setMonth(addMonths(month, 1))}>
               Next
             </Button>
           </div>
         </div>
-        {err && <p className="text-sm text-destructive">{err}</p>}
-        <div className="grid grid-cols-7 gap-2">
+        {err && <p className="text-sm lg:text-base text-destructive">{err}</p>}
+        <div className="grid grid-cols-7 gap-2 lg:gap-3">
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-            <div key={d} className="text-center text-xs font-medium text-muted-foreground">
+            <div key={d} className="text-center text-xs lg:text-sm font-medium text-muted-foreground">
               {d}
             </div>
           ))}
           {loading ? (
-            <div className="col-span-7 rounded-lg border bg-card p-6 text-center">Loading…</div>
+            <div className="col-span-7 rounded-lg border bg-card p-6 lg:p-8 text-center text-base lg:text-lg">
+              Loading…
+            </div>
           ) : (
             gridDays.map((d, i) => <Cell key={i} date={d} />)
           )}
         </div>
-        <p className="text-sm text-muted-foreground">Green = your shift; Blue = available; Gray = full.</p>
+        <p className="text-sm lg:text-base text-muted-foreground">Green = your shift; Blue = available; Gray = full.</p>
       </main>
     </RequireAuth>
   )
