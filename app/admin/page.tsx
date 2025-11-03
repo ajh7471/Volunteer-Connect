@@ -204,7 +204,6 @@ export default function AdminPage() {
                   <div className="text-center py-8 text-muted-foreground">Loading day…</div>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="grid gap-3 md:grid-cols-3">
                     {(["AM", "MID", "PM"] as const).map((slot) => {
                       const shift = shifts.find((s) => s.slot === slot)
                       const list = assignmentsByShift.get(shift?.id || "") || []
