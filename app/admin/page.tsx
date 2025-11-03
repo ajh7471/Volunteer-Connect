@@ -185,18 +185,17 @@ export default function AdminPage() {
           <>
             <Card>
               <CardContent className="pt-6 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-3">
                   <label className="text-sm font-medium">Select day</label>
-                  <Input type="date" className="w-full sm:w-48" value={day} onChange={(e) => setDay(e.target.value)} />
+                  <Input type="date" className="w-48" value={day} onChange={(e) => setDay(e.target.value)} />
                   {monthEmpty && (
                     <Button
                       onClick={seedMonth}
                       variant="default"
-                      size="sm"
                       disabled={pendingSeed}
-                      className={`w-full sm:w-auto ${pendingSeed ? "opacity-60 cursor-wait" : ""}`}
+                      className={pendingSeed ? "opacity-60 cursor-wait" : ""}
                     >
-                      {pendingSeed ? "Seeding..." : `Seed ${day.slice(0, 7)}`}
+                      {pendingSeed ? "Seeding..." : `Seed shifts for ${day.slice(0, 7)}`}
                     </Button>
                   )}
                 </div>
@@ -205,6 +204,7 @@ export default function AdminPage() {
                   <div className="text-center py-8 text-muted-foreground">Loading day…</div>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-3">
                     {(["AM", "MID", "PM"] as const).map((slot) => {
                       const shift = shifts.find((s) => s.slot === slot)
                       const list = assignmentsByShift.get(shift?.id || "") || []
