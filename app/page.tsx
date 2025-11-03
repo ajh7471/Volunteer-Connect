@@ -32,24 +32,31 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 sm:space-y-12">
       {/* Hero Section */}
-      <div className="text-center space-y-4 py-12">
-        <h1 className="text-4xl font-bold tracking-tight text-balance">Welcome to Volunteer Connect</h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+      <div className="text-center space-y-4 py-8 sm:py-12">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-balance">
+          Welcome to Volunteer Connect
+        </h1>
+        <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance px-4">
           Coordinate volunteer shifts with ease. Sign up for shifts, view your schedule, and help make a difference.
         </p>
-        <div className="flex gap-4 justify-center pt-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-4 px-4">
           {isAuthenticated ? (
-            <Button size="lg" onClick={() => router.push("/calendar")}>
+            <Button size="lg" onClick={() => router.push("/calendar")} className="w-full sm:w-auto">
               View Calendar
             </Button>
           ) : (
             <>
-              <Button size="lg" onClick={() => router.push("/auth/signup")}>
+              <Button size="lg" onClick={() => router.push("/auth/signup")} className="w-full sm:w-auto">
                 Get Started
               </Button>
-              <Button size="lg" variant="outline" onClick={() => router.push("/auth/login")}>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => router.push("/auth/login")}
+                className="w-full sm:w-auto"
+              >
                 Login
               </Button>
             </>
@@ -58,7 +65,7 @@ export default function HomePage() {
       </div>
 
       {/* Features */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card>
           <CardHeader>
             <Calendar className="h-10 w-10 mb-2 text-primary" />
@@ -90,13 +97,13 @@ export default function HomePage() {
       {!isAuthenticated && (
         <Card className="bg-muted/50">
           <CardHeader>
-            <CardTitle className="text-center">Ready to get started?</CardTitle>
+            <CardTitle className="text-center text-xl sm:text-2xl">Ready to get started?</CardTitle>
             <CardDescription className="text-center">
               Create an account to start signing up for volunteer shifts
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <Button size="lg" onClick={() => router.push("/auth/signup")}>
+            <Button size="lg" onClick={() => router.push("/auth/signup")} className="w-full sm:w-auto">
               Sign Up Now
             </Button>
           </CardContent>

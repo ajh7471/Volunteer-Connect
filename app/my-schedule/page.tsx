@@ -73,7 +73,7 @@ export default function MySchedule() {
   return (
     <RequireAuth>
       <main className="space-y-4">
-        <h1 className="text-3xl font-bold text-foreground">My Schedule</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Schedule</h1>
 
         {err && (
           <Alert variant="destructive">
@@ -89,7 +89,7 @@ export default function MySchedule() {
             {items.map(({ a, s }) => (
               <div
                 key={a.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3"
               >
                 <div className="text-sm">
                   <div className="font-medium text-card-foreground">
@@ -102,6 +102,7 @@ export default function MySchedule() {
                 <Button
                   variant="destructive"
                   size="sm"
+                  className="w-full sm:w-auto"
                   onClick={async () => {
                     const { error } = await supabase
                       .from("shift_assignments")

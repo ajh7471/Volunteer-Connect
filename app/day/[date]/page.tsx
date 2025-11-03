@@ -42,9 +42,9 @@ export default function DayRosterPage() {
 
   return (
     <main className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Roster — {date}</h1>
-        <Button asChild variant="outline">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold">Roster — {date}</h1>
+        <Button asChild variant="outline" className="w-full sm:w-auto bg-transparent">
           <Link href="/calendar">Back to calendar</Link>
         </Button>
       </div>
@@ -55,7 +55,7 @@ export default function DayRosterPage() {
         </Alert>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {(["AM", "MID", "PM"] as const).map((slot) => {
           const list = bySlot.get(slot) || []
           return (
