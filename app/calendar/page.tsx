@@ -12,6 +12,7 @@ import { addMonths, ymd } from "@/lib/date"
 import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStatus } from "@/lib/shifts"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
+import { joinWaitlist } from "@/app/admin/shift-management-actions"
 
 export default function CalendarPage() {
   const router = useRouter()
@@ -100,6 +101,22 @@ export default function CalendarPage() {
       await loadMonthData()
       setSelectedDate(null)
     }
+  }
+
+  async function handleJoinWaitlist(shiftId: string) {
+    if (!userId) return
+
+    setSigningUp(true)
+    const result = await joinWaitlist(shiftId)
+
+    if (result.success) {
+      toast.success(`Joined waitlist! You're position #${result.position}`)
+      await loadMonthData()
+    } else {
+      toast.error(result.error || "Failed to join waitlist")
+    }
+
+    setSigningUp(false)
   }
 
   // Get shifts for selected date
@@ -258,11 +275,31 @@ export default function CalendarPage() {
                               >
                                 Remove from Shift
                               </Button>
+                            ) : isFull ? (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                disabled={signingUp}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleJoinWaitlist(shift.id)
+                                }}
+                              >
+                                {signingUp ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Joining...
+                                  </>
+                                ) : (
+                                  "Join Waitlist"
+                                )}
+                              </Button>
                             ) : (
                               <Button
                                 size="sm"
                                 className="w-full"
-                                disabled={isFull || signingUp}
+                                disabled={signingUp}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleSignUp(shift.id)
@@ -273,8 +310,6 @@ export default function CalendarPage() {
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Signing up...
                                   </>
-                                ) : isFull ? (
-                                  "Shift Full"
                                 ) : (
                                   "Add to My Shifts"
                                 )}

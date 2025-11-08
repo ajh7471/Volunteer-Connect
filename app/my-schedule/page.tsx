@@ -5,13 +5,14 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Loader2 } from "lucide-react"
+import { Calendar, Clock, Loader2, ArrowRightLeft, Users } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd } from "@/lib/date"
 import { toast } from "@/lib/toast"
 import Link from "next/link"
 import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
 import { Download } from "lucide-react"
+import { requestShiftSwap, leaveWaitlist, acceptWaitlistSpot } from "@/app/admin/shift-management-actions"
 
 type Assignment = {
   id: string
@@ -22,8 +23,21 @@ type Assignment = {
   end_time: string
 }
 
+type WaitlistEntry = {
+  id: string
+  shift_id: string
+  position: number
+  status: string
+  joined_at: string
+  shift_date: string
+  slot: string
+  start_time: string
+  end_time: string
+}
+
 export default function MySchedulePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
 
@@ -80,7 +94,51 @@ export default function MySchedulePage() {
       .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
     setAssignments(formatted)
+
+    await loadWaitlist(uid, today)
+
     setLoading(false)
+  }
+
+  async function loadWaitlist(uid: string, today: string) {
+    const { data: waitlistData } = await supabase
+      .from("shift_waitlist")
+      .select(
+        `
+        id,
+        shift_id,
+        position,
+        status,
+        joined_at,
+        shifts (
+          shift_date,
+          slot,
+          start_time,
+          end_time
+        )
+      `,
+      )
+      .eq("user_id", uid)
+      .in("status", ["waiting", "notified"])
+
+    if (waitlistData) {
+      const formattedWaitlist = waitlistData
+        .filter((w: any) => w.shifts?.shift_date >= today)
+        .map((w: any) => ({
+          id: w.id,
+          shift_id: w.shift_id,
+          position: w.position,
+          status: w.status,
+          joined_at: w.joined_at,
+          shift_date: w.shifts.shift_date,
+          slot: w.shifts.slot,
+          start_time: w.shifts.start_time,
+          end_time: w.shifts.end_time,
+        }))
+        .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
+
+      setWaitlistEntries(formattedWaitlist)
+    }
   }
 
   async function handleCancel(assignmentId: string) {
@@ -93,6 +151,45 @@ export default function MySchedulePage() {
     } else {
       toast.success("Signup cancelled successfully")
       await loadAssignments()
+    }
+  }
+
+  async function handleRequestSwap(assignmentId: string) {
+    const message = prompt("Enter an optional message for your swap request:")
+    if (message === null) return // User cancelled
+
+    const result = await requestShiftSwap(assignmentId, null, message || undefined)
+
+    if (result.success) {
+      toast.success("Swap request created! Other volunteers will be notified.")
+    } else {
+      toast.error(result.error || "Failed to create swap request")
+    }
+  }
+
+  async function handleLeaveWaitlist(waitlistId: string) {
+    if (!confirm("Leave the waitlist for this shift?")) return
+
+    const result = await leaveWaitlist(waitlistId)
+
+    if (result.success) {
+      toast.success("Left waitlist successfully")
+      await loadAssignments()
+    } else {
+      toast.error(result.error || "Failed to leave waitlist")
+    }
+  }
+
+  async function handleAcceptWaitlist(waitlistId: string) {
+    if (!confirm("Accept this shift? You will be added to the schedule.")) return
+
+    const result = await acceptWaitlistSpot(waitlistId)
+
+    if (result.success) {
+      toast.success("Shift added to your schedule!")
+      await loadAssignments()
+    } else {
+      toast.error(result.error || "Failed to accept shift")
     }
   }
 
@@ -158,6 +255,60 @@ export default function MySchedulePage() {
           </div>
         </div>
 
+        {waitlistEntries.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Waitlist
+              </CardTitle>
+              <CardDescription>Shifts you're waiting for</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {waitlistEntries.map((entry) => {
+                  const date = new Date(entry.shift_date)
+                  const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
+                  const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
+
+                  return (
+                    <div key={entry.id} className="flex items-center justify-between border rounded-lg p-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium">
+                            {dayOfWeek}, {monthDay}
+                          </span>
+                          <Badge variant={entry.status === "notified" ? "default" : "secondary"}>
+                            {entry.status === "notified"
+                              ? `Spot Available! (Pos #${entry.position})`
+                              : `Position #${entry.position}`}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            {entry.start_time} - {entry.end_time}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {entry.status === "notified" && (
+                          <Button size="sm" onClick={() => handleAcceptWaitlist(entry.id)}>
+                            Accept Shift
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => handleLeaveWaitlist(entry.id)}>
+                          Leave Waitlist
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Assignments List */}
         {assignments.length === 0 ? (
           <Card>
@@ -213,11 +364,20 @@ export default function MySchedulePage() {
                         variant="outline"
                         size="sm"
                         className="flex-1 bg-transparent"
-                        onClick={() => handleCancel(assignment.id)}
+                        onClick={() => handleRequestSwap(assignment.id)}
                       >
-                        Cancel
+                        <ArrowRightLeft className="mr-2 h-4 w-4" />
+                        Swap
                       </Button>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full bg-transparent"
+                      onClick={() => handleCancel(assignment.id)}
+                    >
+                      Cancel
+                    </Button>
                   </CardContent>
                 </Card>
               )
