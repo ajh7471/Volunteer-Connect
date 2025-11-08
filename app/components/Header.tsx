@@ -48,6 +48,8 @@ export default function Header() {
             <NavLink href="/" label="Home" />
             {userId && <NavLink href="/calendar" label="Calendar" />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" />}
+            {userId && <NavLink href="/profile" label="Profile" />}
+            {/* </CHANGE> */}
             {role === "admin" && <NavLink href="/admin" label="Admin" />}
           </nav>
 
@@ -83,6 +85,8 @@ export default function Header() {
             <NavLink href="/" label="Home" onClick={() => setMobileMenuOpen(false)} />
             {userId && <NavLink href="/calendar" label="Calendar" onClick={() => setMobileMenuOpen(false)} />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" onClick={() => setMobileMenuOpen(false)} />}
+            {userId && <NavLink href="/profile" label="Profile" onClick={() => setMobileMenuOpen(false)} />}
+            {/* </CHANGE> */}
             {role === "admin" && <NavLink href="/admin" label="Admin" onClick={() => setMobileMenuOpen(false)} />}
             <div className="mt-2 flex flex-col gap-2">
               {userId ? (

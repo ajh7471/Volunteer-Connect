@@ -18,6 +18,14 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Volunteer Connect",
   description: "Coordinate volunteer shifts with ease",
+  manifest: "/manifest.json",
+  themeColor: "#8B5CF6",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "VP Volunteer",
+  },,
+  // </CHANGE>
     generator: 'v0.app'
 }
 

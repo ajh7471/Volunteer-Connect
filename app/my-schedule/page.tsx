@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabaseClient"
 import { ymd } from "@/lib/date"
 import { toast } from "@/lib/toast"
 import Link from "next/link"
+import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
+import { Download } from "lucide-react"
 
 type Assignment = {
   id: string
@@ -94,6 +96,36 @@ export default function MySchedulePage() {
     }
   }
 
+  async function handleExportShift(assignment: Assignment) {
+    const event: CalendarEvent = {
+      id: assignment.id,
+      summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
+      description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}\nDate: ${new Date(assignment.shift_date).toLocaleDateString()}`,
+      location: "Vanderpump Dogs, Los Angeles, CA",
+      startDate: new Date(`${assignment.shift_date}T${assignment.start_time}`),
+      endDate: new Date(`${assignment.shift_date}T${assignment.end_time}`),
+    }
+
+    const icsContent = generateICS([event])
+    downloadICS(icsContent, `volunteer-shift-${assignment.shift_date}.ics`)
+    toast.success("Shift exported to calendar!")
+  }
+
+  async function handleExportAll() {
+    const events: CalendarEvent[] = assignments.map((assignment) => ({
+      id: assignment.id,
+      summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
+      description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}`,
+      location: "Vanderpump Dogs, Los Angeles, CA",
+      startDate: new Date(`${assignment.shift_date}T${assignment.start_time}`),
+      endDate: new Date(`${assignment.shift_date}T${assignment.end_time}`),
+    }))
+
+    const icsContent = generateICS(events)
+    downloadICS(icsContent, "vanderpump-volunteer-shifts.ics")
+    toast.success("All shifts exported!")
+  }
+
   if (loading) {
     return (
       <RequireAuth>
@@ -113,9 +145,17 @@ export default function MySchedulePage() {
             <h1 className="text-3xl font-bold tracking-tight">My Schedule</h1>
             <p className="text-muted-foreground">View and manage your upcoming shifts</p>
           </div>
-          <Button asChild>
-            <Link href="/calendar">Browse Calendar</Link>
-          </Button>
+          <div className="flex gap-2">
+            {assignments.length > 0 && (
+              <Button variant="outline" onClick={handleExportAll}>
+                <Download className="mr-2 h-4 w-4" />
+                Export All
+              </Button>
+            )}
+            <Button asChild>
+              <Link href="/calendar">Browse Calendar</Link>
+            </Button>
+          </div>
         </div>
 
         {/* Assignments List */}
@@ -159,14 +199,25 @@ export default function MySchedulePage() {
                         {assignment.start_time} - {assignment.end_time}
                       </span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full bg-transparent"
-                      onClick={() => handleCancel(assignment.id)}
-                    >
-                      Cancel Shift
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-transparent"
+                        onClick={() => handleExportShift(assignment)}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-transparent"
+                        onClick={() => handleCancel(assignment.id)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )
