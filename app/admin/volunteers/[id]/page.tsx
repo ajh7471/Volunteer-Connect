@@ -11,6 +11,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { ToastManager } from "@/lib/toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 type Profile = {
   id: string
@@ -18,6 +30,7 @@ type Profile = {
   phone: string | null
   role: string | null
   created_at: string
+  active: boolean | null
 }
 
 type Assignment = {
@@ -38,7 +51,7 @@ export default function VolunteerProfilePage() {
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [deactivating, setDeactivating] = useState(false)
 
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
@@ -76,17 +89,55 @@ export default function VolunteerProfilePage() {
   }
 
   async function handleSave() {
+    if (!name.trim()) {
+      ToastManager.error("Name is required")
+      return
+    }
+
+    if (phone && !/^\+?[\d\s-()]+$/.test(phone)) {
+      ToastManager.error("Please enter a valid phone number")
+      return
+    }
+
     setLoading(true)
     setError(null)
-    setSuccess(null)
 
     const { error: updateError } = await supabase.from("profiles").update({ name, phone, role }).eq("id", id)
 
     if (updateError) {
       setError(updateError.message)
+      ToastManager.error("Failed to update profile")
     } else {
-      setSuccess("Profile updated successfully")
+      ToastManager.success("Profile updated successfully")
       setEditing(false)
+      loadProfile()
+    }
+    setLoading(false)
+  }
+
+  async function handleDeactivate() {
+    setDeactivating(true)
+
+    const { error: updateError } = await supabase.from("profiles").update({ active: false }).eq("id", id)
+
+    if (updateError) {
+      ToastManager.error("Failed to deactivate account")
+    } else {
+      ToastManager.success("Account deactivated successfully")
+      router.push("/admin/volunteers")
+    }
+    setDeactivating(false)
+  }
+
+  async function handleReactivate() {
+    setLoading(true)
+
+    const { error: updateError } = await supabase.from("profiles").update({ active: true }).eq("id", id)
+
+    if (updateError) {
+      ToastManager.error("Failed to reactivate account")
+    } else {
+      ToastManager.success("Account reactivated successfully")
       loadProfile()
     }
     setLoading(false)
@@ -105,7 +156,14 @@ export default function VolunteerProfilePage() {
       <div className="space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{profile.name || "Unnamed"}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {profile.name || "Unnamed"}
+              {profile.active === false && (
+                <Badge variant="destructive" className="ml-3">
+                  Inactive
+                </Badge>
+              )}
+            </h1>
             <p className="text-muted-foreground">Volunteer Profile</p>
           </div>
           <Button variant="outline" onClick={() => router.push("/admin/volunteers")}>
@@ -116,12 +174,6 @@ export default function VolunteerProfilePage() {
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert>
-            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
 
@@ -141,13 +193,21 @@ export default function VolunteerProfilePage() {
             {editing ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={loading} />
+                  <Label htmlFor="name">Name *</Label>
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={loading} required />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={loading} />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-muted-foreground">Enter phone number with country code</p>
                 </div>
 
                 <div className="space-y-2">
@@ -201,11 +261,59 @@ export default function VolunteerProfilePage() {
                     </div>
                   </div>
                   <div>
+                    <Label className="text-muted-foreground">Status</Label>
+                    <div>
+                      <Badge variant={profile.active === false ? "destructive" : "default"}>
+                        {profile.active === false ? "Inactive" : "Active"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2">
                     <Label className="text-muted-foreground">User ID</Label>
                     <p className="font-mono text-sm">{profile.id}</p>
                   </div>
                 </div>
               </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardDescription>Irreversible actions that affect this volunteer account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {profile.active === false ? (
+              <Button variant="default" onClick={handleReactivate} disabled={loading}>
+                Reactivate Account
+              </Button>
+            ) : (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={deactivating}>
+                    Deactivate Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will deactivate the volunteer account. They will no longer be able to log in or sign up for
+                      shifts. Historical data will be preserved. You can reactivate the account later if needed.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeactivate}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Deactivate
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </CardContent>
         </Card>
