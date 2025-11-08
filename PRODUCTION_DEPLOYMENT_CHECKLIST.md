@@ -4,17 +4,22 @@
 
 ### Database Setup ✅
 - [x] Admin user verified in Supabase: volunteer@vanderpumpdogs.org ✅
+  - **Status:** Pre-configured and ready
+  - **Password:** VolunteerAdmin2026
+  - **Role:** admin
+  - **No creation needed** ✅
 - [ ] Run `scripts/012_production_admin_setup.sql` in Supabase SQL Editor
 - [ ] Verify shift times are correct: 9am-12pm, 12pm-3pm, 3pm-5pm
 - [ ] Confirm future shifts are seeded (next 90 days)
 
 **Verification Query:**
 \`\`\`sql
--- Check admin setup (ALREADY VERIFIED ✓)
+-- Check admin setup (ALREADY EXISTS IN DATABASE ✓)
 SELECT au.email, p.role, p.active, au.email_confirmed_at
 FROM profiles p
 JOIN auth.users au ON p.id = au.id
 WHERE au.email = 'volunteer@vanderpumpdogs.org';
+-- Expected: Should return existing admin record
 
 -- Check shift schedule
 SELECT shift_date, slot, start_time, end_time, capacity
@@ -169,9 +174,10 @@ CREATE OR REPLACE FUNCTION seed_shifts_range(start_date DATE, end_date DATE)
 **Common Issues & Solutions:**
 
 **Issue: Admin can't login**
+- Admin user already exists - verify credentials haven't changed
 - Verify email confirmed in Supabase Auth
-- Check profile role is set to 'admin'
-- Reset password if needed in Supabase dashboard
+- Check profile role is still set to 'admin'
+- Password should be: VolunteerAdmin2026 (unless manually changed)
 
 **Issue: Shifts not appearing**
 - Run seed_shifts_range for affected month
@@ -204,6 +210,7 @@ CREATE OR REPLACE FUNCTION seed_shifts_range(start_date DATE, end_date DATE)
 
 **Production URL:** https://your-domain.vercel.app
 **Admin Login:** volunteer@vanderpumpdogs.org
+**Status:** ✅ Pre-configured in Supabase (no setup required)
 **Database:** Supabase (Connected via environment variables)
 **Hosting:** Vercel
 **Framework:** Next.js 14 with React 19

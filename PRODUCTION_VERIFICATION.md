@@ -61,20 +61,30 @@ All application components are using **real Supabase database connections**:
 Email: volunteer@vanderpumpdogs.org
 Password: VolunteerAdmin2026
 Role: admin
-Status: Must be created in Supabase dashboard
+Status: ✅ Already exists and verified in Supabase Auth
 \`\`\`
 
-**Setup Steps:**
-1. Create user in Supabase Auth dashboard with email `volunteer@vanderpumpdogs.org`
-2. Set password to `VolunteerAdmin2026`
-3. Run `scripts/012_production_admin_setup.sql` to configure profile and role
-4. Verify login at `/auth/login`
+**No Setup Required:** The admin user is already created and configured in Supabase database.
 
-**Script Will Automatically:**
-- ✅ Ensure admin profile exists in `profiles` table
-- ✅ Set role to 'admin'
-- ✅ Mark account as active
-- ✅ Configure display name and phone
+**Verification Only:**
+\`\`\`sql
+-- Verify admin exists and is properly configured
+SELECT 
+  au.email,
+  au.email_confirmed_at,
+  p.role,
+  p.active,
+  p.name
+FROM auth.users au
+JOIN profiles p ON p.id = au.id
+WHERE au.email = 'volunteer@vanderpumpdogs.org';
+\`\`\`
+
+**Expected Result:**
+- Email: volunteer@vanderpumpdogs.org
+- Role: admin
+- Active: true
+- Email Confirmed: Yes
 
 ---
 
@@ -185,14 +195,16 @@ LIMIT 9;
 □ Check RLS policies active
 \`\`\`
 
-#### 2. Admin Account Creation
+#### 2. Admin Account Verification
 \`\`\`bash
-# In Supabase Dashboard > Authentication > Users
-□ Create user: volunteer@vanderpumpdogs.org
-□ Set password: VolunteerAdmin2026
-□ Verify email (if email confirmation required)
-□ Check user appears in auth.users table
+# Admin user already exists - verify only
+□ Confirm user exists: volunteer@vanderpumpdogs.org
+□ Verify role is 'admin' in profiles table
+□ Check account is active
+□ Confirm email is verified
 \`\`\`
+
+**Note:** Admin account is pre-configured. No creation steps needed.
 
 #### 3. Application Verification
 \`\`\`bash
