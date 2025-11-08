@@ -28,7 +28,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
 
   if (!ready) {
     return (
-      <div className="mx-auto mt-16 w-full max-w-md rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
+      <div className="mx-auto mt-16 w-full max-w-md rounded-2xl border bg-background p-6 text-center shadow-sm">
         <p className="text-muted-foreground">Checking session…</p>
       </div>
     )

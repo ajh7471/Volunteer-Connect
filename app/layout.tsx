@@ -2,9 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
-import { Analytics } from "@vercel/analytics/react"
 import Header from "./components/Header"
-import { ToastProvider } from "./components/Toast"
+import ToastContainer from "./components/ToastContainer"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,8 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Volunteer Connect",
-  description: "Connect volunteers with opportunities",
-  generator: "v0.app",
+  description: "Coordinate volunteer shifts with ease",
+    generator: 'v0.app'
 }
 
 export default function RootLayout({
@@ -29,14 +28,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-background text-foreground`}
-      >
-        <ToastProvider>
-          <Header />
-          <div className="container max-w-4xl py-6">{children}</div>
-          <Analytics />
-        </ToastProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-background font-sans antialiased`}>
+        <Header />
+        <main className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <ToastContainer />
       </body>
     </html>
   )

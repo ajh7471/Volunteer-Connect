@@ -1,245 +1,292 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import RequireAuth from "@/app/components/RequireAuth"
-import { useEffect, useMemo, useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import { addMonths, daysInGrid, endOfMonth, isSameMonth, startOfMonth, ymd } from "@/lib/date"
+import { MonthlyGrid } from "@/components/calendar/MonthlyGrid"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { useToast } from "@/app/components/Toast"
-
-type Shift = {
-  id: string
-  shift_date: string
-  slot: "AM" | "MID" | "PM"
-  start_time: string
-  end_time: string
-  capacity: number
-}
-type Assignment = { id: string; shift_id: string; user_id: string }
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ChevronLeft, ChevronRight, CalendarIcon, Loader2 } from "lucide-react"
+import { addMonths, ymd } from "@/lib/date"
+import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStatus } from "@/lib/shifts"
+import { supabase } from "@/lib/supabaseClient"
+import { toast } from "@/lib/toast"
 
 export default function CalendarPage() {
-  const [month, setMonth] = useState<Date>(startOfMonth(new Date()))
-  const [userId, setUserId] = useState<string | null>(null)
-  const [shifts, setShifts] = useState<Shift[]>([])
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [counts, setCounts] = useState<Record<string, number>>({})
+  const router = useRouter()
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [shifts, setShifts] = useState<ShiftWithCapacity[]>([])
   const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState<string | null>(null)
-  const [pending, setPending] = useState<string | null>(null)
-  const { push } = useToast()
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userAssignments, setUserAssignments] = useState<Set<string>>(new Set())
+  const [signingUp, setSigningUp] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
+    loadUser()
   }, [])
 
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      setLoading(true)
-      setErr(null)
-      const min = ymd(startOfMonth(month))
-      const max = ymd(endOfMonth(month))
-      const [{ data: sData, error: sErr }, { data: aData, error: aErr }] = await Promise.all([
-        supabase
-          .from("shifts")
-          .select("*")
-          .gte("shift_date", min)
-          .lte("shift_date", max)
-          .order("shift_date", { ascending: true }),
-        supabase
-          .from("shift_assignments")
-          .select("*")
-          .gte("created_at", `${min} 00:00:00`)
-          .lte("created_at", `${max} 23:59:59`),
-      ])
-      if (!mounted) return
-      if (sErr) setErr(sErr.message)
-      if (aErr) setErr(aErr.message)
-      setShifts((sData as Shift[]) ?? [])
-      setAssignments((aData as Assignment[]) ?? [])
-      setLoading(false)
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [month])
+    loadMonthData()
+  }, [currentMonth])
 
-  const byDateSlot = useMemo(() => {
-    const m = new Map<string, Shift>()
-    for (const s of shifts) m.set(`${s.shift_date}_${s.slot}`, s)
-    return m
-  }, [shifts])
+  async function loadUser() {
+    const { data } = await supabase.auth.getUser()
+    setUserId(data.user?.id || null)
+  }
 
-  const assignmentsByShift = useMemo(() => {
-    const m = new Map<string, Assignment[]>()
-    for (const a of assignments) {
-      const arr = m.get(a.shift_id) || []
-      arr.push(a)
-      m.set(a.shift_id, arr)
-    }
-    return m
-  }, [assignments])
+  async function loadMonthData() {
+    setLoading(true)
 
-  useEffect(() => {
-    async function loadCounts() {
-      if (shifts.length === 0) {
-        setCounts({})
-        return
+    const monthShifts = await getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth())
+    setShifts(monthShifts)
+
+    // Load user's assignments for this month
+    if (userId) {
+      const startDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1))
+      const endDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0))
+
+      const { data } = await supabase.from("shift_assignments").select("shift_id").eq("user_id", userId)
+
+      if (data) {
+        setUserAssignments(new Set(data.map((a) => a.shift_id)))
       }
-      const ids = shifts.map((s) => s.id)
-      const { data, error } = await supabase.rpc("shift_counts", { ids })
-      if (error) return // silently ignore; capacity still enforced
-      const map: Record<string, number> = {}
-      ;(data as { shift_id: string; qty: number }[]).forEach((row) => {
-        map[row.shift_id] = row.qty
-      })
-      setCounts(map)
     }
-    loadCounts()
-  }, [shifts])
 
-  async function refreshAssignments() {
-    const min = ymd(startOfMonth(month))
-    const max = ymd(endOfMonth(month))
-    const { data, error } = await supabase
-      .from("shift_assignments")
-      .select("*")
-      .gte("created_at", `${min} 00:00:00`)
-      .lte("created_at", `${max} 23:59:59`)
-    if (error) setErr(error.message)
-    setAssignments((data as Assignment[]) ?? [])
+    setLoading(false)
   }
 
-  async function join(shift: Shift) {
-    if (pending) return
-    if (!userId) {
-      push({ type: "error", msg: "Please login." })
-      return setErr("Please login.")
-    }
-    setPending(shift.id)
-    setErr(null)
-    const { error } = await supabase.from("shift_assignments").insert({ shift_id: shift.id, user_id: userId })
-    if (error) {
-      setErr(error.message)
-      push({ type: "error", msg: error.message })
-    } else {
-      await refreshAssignments()
-      push({ type: "success", msg: "Added to shift" })
-    }
-    setPending(null)
+  function handlePrevMonth() {
+    setCurrentMonth(addMonths(currentMonth, -1))
+    setSelectedDate(null)
   }
 
-  async function leave(shift: Shift) {
-    if (pending) return
+  function handleNextMonth() {
+    setCurrentMonth(addMonths(currentMonth, 1))
+    setSelectedDate(null)
+  }
+
+  function handleDayClick(date: Date) {
+    setSelectedDate(date)
+  }
+
+  async function handleSignUp(shiftId: string) {
     if (!userId) return
-    setPending(shift.id)
-    setErr(null)
-    const { error } = await supabase.from("shift_assignments").delete().match({ shift_id: shift.id, user_id: userId })
-    if (error) {
-      setErr(error.message)
-      push({ type: "error", msg: error.message })
+
+    setSigningUp(true)
+    const result = await signUpForShift(shiftId, userId)
+
+    if (result.success) {
+      toast.success("Successfully signed up for shift!")
+      await loadMonthData()
+      setSelectedDate(null)
     } else {
-      await refreshAssignments()
-      push({ type: "success", msg: "Removed from shift" })
+      toast.error(result.error || "Failed to sign up")
     }
-    setPending(null)
+
+    setSigningUp(false)
   }
 
-  function Cell({ date }: { date: Date }) {
-    const inMonth = isSameMonth(date, month)
-    const dYMD = ymd(date)
-    const slots: Array<Shift["slot"]> = ["AM", "MID", "PM"]
-    return (
-      <div
-        className={`min-h-32 rounded-lg border p-2 ${inMonth ? "bg-card" : "bg-muted/50 text-muted-foreground"} flex flex-col`}
-      >
-        <div className="mb-1 text-xs font-medium">{date.getDate()}</div>
-        <div className="mt-auto space-y-1">
-          {slots.map((slot) => {
-            const s = byDateSlot.get(`${dYMD}_${slot}`)
-            if (!s)
-              return (
-                <div key={slot} className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-                  No {slot}
-                </div>
-              )
-            const list = assignmentsByShift.get(s.id) || []
-            const mine = !!list.find((a) => a.user_id === userId)
-            const full = (counts[s.id] ?? 0) >= s.capacity
-            return (
-              <button
-                key={slot}
-                onClick={() => (mine ? leave(s) : join(s))}
-                disabled={pending === s.id || (!mine && full)}
-                className={[
-                  "w-full rounded-md px-2 py-1 text-left text-xs transition",
-                  pending === s.id
-                    ? "opacity-60 cursor-wait"
-                    : mine
-                      ? "bg-green-100 ring-2 ring-green-400 hover:bg-green-200"
-                      : full
-                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                        : "bg-blue-100 hover:bg-blue-200",
-                ].join(" ")}
-                title={mine ? "Click to leave this shift" : full ? "Shift is full" : "Click to join this shift"}
-              >
-                <span className="font-medium">{slot}</span>
-                <span className="ml-2">
-                  {counts[s.id] ?? 0}/{s.capacity}
-                </span>
-                {mine && <span className="ml-2 text-green-700 dark:text-green-400">You</span>}
-              </button>
-            )
-          })}
-          <Link
-            href={`/day/${dYMD}`}
-            className="mt-2 block text-center text-xs text-blue-600 hover:text-blue-800 underline"
-          >
-            View roster
-          </Link>
-        </div>
-      </div>
-    )
+  async function handleCancel(assignmentId: string) {
+    if (!confirm("Cancel your signup for this shift?")) return
+
+    const { error } = await supabase.from("shift_assignments").delete().eq("id", assignmentId)
+
+    if (error) {
+      toast.error("Failed to cancel signup")
+    } else {
+      toast.success("Signup cancelled successfully")
+      await loadMonthData()
+      setSelectedDate(null)
+    }
   }
 
-  const gridDays = useMemo(() => daysInGrid(month), [month])
+  // Get shifts for selected date
+  const selectedDateShifts = selectedDate ? shifts.filter((s) => s.shift_date === ymd(selectedDate)) : []
+
+  const monthName = currentMonth.toLocaleString("default", { month: "long", year: "numeric" })
 
   return (
     <RequireAuth>
-      <main className="space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight">Volunteer Calendar</h1>
-        <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold">
-            {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
-          </div>
-          <div className="space-x-2">
-            <Button variant="outline" onClick={() => setMonth(addMonths(month, -1))}>
-              Prev
-            </Button>
-            <Button variant="outline" onClick={() => setMonth(startOfMonth(new Date()))}>
-              Today
-            </Button>
-            <Button variant="outline" onClick={() => setMonth(addMonths(month, 1))}>
-              Next
-            </Button>
-          </div>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Volunteer Calendar</h1>
+          <p className="text-muted-foreground">View available shifts and sign up</p>
         </div>
-        {err && <p className="text-sm text-destructive">{err}</p>}
-        <div className="grid grid-cols-7 gap-2">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-            <div key={d} className="text-center text-xs font-medium text-muted-foreground">
-              {d}
+
+        {/* Month Navigation */}
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+              <span className="text-lg font-semibold">{monthName}</span>
             </div>
-          ))}
-          {loading ? (
-            <div className="col-span-7 rounded-lg border bg-card p-6 text-center">Loading…</div>
-          ) : (
-            gridDays.map((d, i) => <Cell key={i} date={d} />)
-          )}
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Legend */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Shift Status Legend</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-12 rounded bg-green-500"></div>
+              <span className="text-sm">Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-12 rounded bg-orange-500"></div>
+              <span className="text-sm">Nearly Full</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-12 rounded bg-red-500"></div>
+              <span className="text-sm">Full</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-12 rounded bg-gray-300"></div>
+              <span className="text-sm">No Shift</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Calendar Grid and Details Panel */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Calendar Grid */}
+          <div className="lg:col-span-2">
+            {loading ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ) : (
+              <MonthlyGrid currentMonth={currentMonth} shifts={shifts} onDayClick={handleDayClick} />
+            )}
+          </div>
+
+          {/* Shift Details Panel */}
+          <div className="lg:col-span-1">
+            {selectedDate ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {selectedDate.toLocaleDateString("default", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </CardTitle>
+                  <CardDescription>
+                    {selectedDateShifts.length === 0
+                      ? "No shifts scheduled"
+                      : `${selectedDateShifts.length} shift(s) available`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {selectedDateShifts.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No shifts have been created for this date yet.</p>
+                  )}
+
+                  {selectedDateShifts.map((shift) => {
+                    const status = getCapacityStatus(shift.capacity, shift.assignments_count)
+                    const isAssigned = userAssignments.has(shift.id)
+                    const isFull = status === "full"
+                    const isPast = new Date(shift.shift_date) < new Date()
+
+                    return (
+                      <div key={shift.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">
+                              {shift.slot === "AM" && "Morning Shift"}
+                              {shift.slot === "MID" && "Midday Shift"}
+                              {shift.slot === "PM" && "Afternoon Shift"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {shift.start_time} - {shift.end_time}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              status === "available"
+                                ? "default"
+                                : status === "nearly-full"
+                                  ? "secondary"
+                                  : "destructive"
+                            }
+                          >
+                            {shift.assignments_count}/{shift.capacity}
+                          </Badge>
+                        </div>
+
+                        {!isPast && (
+                          <>
+                            {isAssigned ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full bg-transparent"
+                                onClick={() => {
+                                  // Find assignment ID
+                                  supabase
+                                    .from("shift_assignments")
+                                    .select("id")
+                                    .eq("shift_id", shift.id)
+                                    .eq("user_id", userId!)
+                                    .single()
+                                    .then(({ data }) => {
+                                      if (data) handleCancel(data.id)
+                                    })
+                                }}
+                              >
+                                Cancel Signup
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                className="w-full"
+                                disabled={isFull || signingUp}
+                                onClick={() => handleSignUp(shift.id)}
+                              >
+                                {signingUp ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Signing up...
+                                  </>
+                                ) : isFull ? (
+                                  "Shift Full"
+                                ) : (
+                                  "Sign Up"
+                                )}
+                              </Button>
+                            )}
+                          </>
+                        )}
+
+                        {isPast && <p className="text-xs text-muted-foreground">This shift has passed</p>}
+                      </div>
+                    )
+                  })}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                  <p className="text-sm text-muted-foreground">Click on a date to view shift details</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">Green = your shift; Blue = available; Gray = full.</p>
-      </main>
+      </div>
     </RequireAuth>
   )
 }

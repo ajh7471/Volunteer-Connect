@@ -1,122 +1,179 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
+import RequireAuth from "@/app/components/RequireAuth"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Calendar, Clock, Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd } from "@/lib/date"
-import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import RequireAuth from "@/app/components/RequireAuth"
+import { toast } from "@/lib/toast"
+import Link from "next/link"
 
-type Shift = { id: string; shift_date: string; slot: "AM" | "MID" | "PM"; start_time: string; end_time: string }
-type Assignment = { id: string; shift_id: string; user_id: string; created_at: string }
+type Assignment = {
+  id: string
+  shift_id: string
+  shift_date: string
+  slot: string
+  start_time: string
+  end_time: string
+}
 
-export default function MySchedule() {
-  const [userId, setUserId] = useState<string | null>(null)
+export default function MySchedulePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [shifts, setShifts] = useState<Record<string, Shift>>({})
-  const [err, setErr] = useState<string | null>(null)
-  const today = ymd(new Date())
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    ;(async () => {
-      const { data } = await supabase.auth.getUser()
-      setUserId(data.user?.id ?? null)
-    })()
+    loadAssignments()
   }, [])
 
-  useEffect(() => {
-    if (!userId) return
-    loadMine()
-  }, [userId])
+  async function loadAssignments() {
+    const { data: userData } = await supabase.auth.getUser()
+    const uid = userData.user?.id
 
-  async function loadMine() {
-    setErr(null)
-    // Get my future assignments (RLS ensures only mine are returned)
-    const { data: aData, error: aErr } = await supabase
-      .from("shift_assignments")
-      .select("*")
-      .gte("created_at", `${today} 00:00:00`)
-      .order("created_at", { ascending: true })
-    if (aErr) {
-      setErr(aErr.message)
+    if (!uid) {
+      setLoading(false)
       return
     }
-    const mine = (aData as Assignment[]) || []
-    // Fetch shifts for those assignments
-    const shiftIds = Array.from(new Set(mine.map((a) => a.shift_id)))
-    if (shiftIds.length) {
-      const { data: sData, error: sErr } = await supabase
-        .from("shifts")
-        .select("id, shift_date, slot, start_time, end_time")
-        .in("id", shiftIds)
-      if (sErr) {
-        setErr(sErr.message)
-        return
-      }
-      const map: Record<string, Shift> = {}
-      ;((sData as Shift[]) || []).forEach((s) => (map[s.id] = s))
-      setShifts(map)
-    } else {
-      setShifts({})
+
+    setUserId(uid)
+
+    // Get upcoming assignments
+    const today = ymd(new Date())
+    const { data, error } = await supabase
+      .from("shift_assignments")
+      .select(
+        `
+        id,
+        shift_id,
+        shifts (
+          shift_date,
+          slot,
+          start_time,
+          end_time
+        )
+      `,
+      )
+      .eq("user_id", uid)
+
+    if (error) {
+      console.error("[v0] Error loading assignments:", error)
+      toast.error("Failed to load your schedule")
+      setLoading(false)
+      return
     }
-    setAssignments(mine)
+
+    const formatted = (data || [])
+      .filter((a: any) => a.shifts?.shift_date >= today)
+      .map((a: any) => ({
+        id: a.id,
+        shift_id: a.shift_id,
+        shift_date: a.shifts.shift_date,
+        slot: a.shifts.slot,
+        start_time: a.shifts.start_time,
+        end_time: a.shifts.end_time,
+      }))
+      .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
+
+    setAssignments(formatted)
+    setLoading(false)
   }
 
-  const items = useMemo(() => {
-    const withShift = assignments
-      .map((a) => ({ a, s: shifts[a.shift_id] }))
-      .filter((x) => x.s)
-      .sort((x, y) => x.s.shift_date.localeCompare(y.s.shift_date) || x.s.slot.localeCompare(y.s.slot))
-    return withShift
-  }, [assignments, shifts])
+  async function handleCancel(assignmentId: string) {
+    if (!confirm("Cancel your signup for this shift?")) return
+
+    const { error } = await supabase.from("shift_assignments").delete().eq("id", assignmentId)
+
+    if (error) {
+      toast.error("Failed to cancel signup")
+    } else {
+      toast.success("Signup cancelled successfully")
+      await loadAssignments()
+    }
+  }
+
+  if (loading) {
+    return (
+      <RequireAuth>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </RequireAuth>
+    )
+  }
 
   return (
     <RequireAuth>
-      <main className="space-y-4">
-        <h1 className="text-3xl font-bold text-foreground">My Schedule</h1>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">My Schedule</h1>
+            <p className="text-muted-foreground">View and manage your upcoming shifts</p>
+          </div>
+          <Button asChild>
+            <Link href="/calendar">Browse Calendar</Link>
+          </Button>
+        </div>
 
-        {err && (
-          <Alert variant="destructive">
-            <AlertDescription>{err}</AlertDescription>
-          </Alert>
-        )}
+        {/* Assignments List */}
+        {assignments.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
+              <p className="mb-2 text-lg font-medium">No upcoming shifts</p>
+              <p className="mb-4 text-sm text-muted-foreground">Sign up for shifts on the calendar to see them here</p>
+              <Button asChild>
+                <Link href="/calendar">View Calendar</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {assignments.map((assignment) => {
+              const date = new Date(assignment.shift_date)
+              const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
+              const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
 
-        {userId === null && <p className="text-sm text-muted-foreground">Checking session…</p>}
-
-        {userId && (
-          <div className="space-y-2">
-            {items.length === 0 && <p className="text-sm text-muted-foreground">No upcoming shifts yet.</p>}
-            {items.map(({ a, s }) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
-              >
-                <div className="text-sm">
-                  <div className="font-medium text-card-foreground">
-                    {s.shift_date} — {s.slot}
-                  </div>
-                  <div className="text-muted-foreground text-xs">
-                    {s.start_time}–{s.end_time}
-                  </div>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={async () => {
-                    const { error } = await supabase
-                      .from("shift_assignments")
-                      .delete()
-                      .match({ shift_id: s.id, user_id: userId })
-                    if (!error) loadMine()
-                  }}
-                >
-                  Leave shift
-                </Button>
-              </div>
-            ))}
+              return (
+                <Card key={assignment.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{dayOfWeek}</CardTitle>
+                        <CardDescription>{monthDay}</CardDescription>
+                      </div>
+                      <Badge>
+                        {assignment.slot === "AM" && "Morning"}
+                        {assignment.slot === "MID" && "Midday"}
+                        {assignment.slot === "PM" && "Afternoon"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>
+                        {assignment.start_time} - {assignment.end_time}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full bg-transparent"
+                      onClick={() => handleCancel(assignment.id)}
+                    >
+                      Cancel Shift
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
-      </main>
+      </div>
     </RequireAuth>
   )
 }
