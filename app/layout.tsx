@@ -24,9 +24,8 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "VP Volunteer",
-  },,
-  // </CHANGE>
-    generator: 'v0.app'
+  },
+  generator: "v0.app",
 }
 
 export default function RootLayout({
