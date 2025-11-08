@@ -1,23 +1,12 @@
-"use client"
-
 import { Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getEmailServiceConfigs } from "@/app/admin/email-service-actions"
-import {
-  handleSaveSendGridConfig,
-  handleSaveGmailConfig,
-  handleValidateSendGrid,
-  handleValidateGmail,
-  handleDeleteConfig,
-} from "./actions"
-import { AlertCircle, CheckCircle2, Mail, Settings, Trash2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, Mail, Settings } from "lucide-react"
+import { SendGridForm } from "./sendgrid-form"
+import { GmailForm } from "./gmail-form"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 async function EmailServiceConfigurations() {
   const configs = await getEmailServiceConfigs()
@@ -100,218 +89,18 @@ async function EmailServiceConfigurations() {
         </CardContent>
       </Card>
 
-      {/* Configuration Forms */}
       <Tabs defaultValue="sendgrid" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="sendgrid">SendGrid</TabsTrigger>
           <TabsTrigger value="gmail">Gmail OAuth</TabsTrigger>
         </TabsList>
 
-        {/* SendGrid Configuration */}
         <TabsContent value="sendgrid">
-          <Card>
-            <CardHeader>
-              <CardTitle>SendGrid Configuration</CardTitle>
-              <CardDescription>
-                Configure SendGrid API for sending emails. Get your API key from{" "}
-                <a
-                  href="https://app.sendgrid.com/settings/api_keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary underline"
-                >
-                  SendGrid Dashboard
-                </a>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form action={handleSaveSendGridConfig} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sendgrid-api-key">API Key</Label>
-                  <Input
-                    id="sendgrid-api-key"
-                    name="apiKey"
-                    type="password"
-                    placeholder="SG.xxxxxxxxxxxxxxxxxxxxx"
-                    defaultValue={sendgridConfig?.sendgrid_api_key || ""}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sendgrid-from-email">From Email</Label>
-                  <Input
-                    id="sendgrid-from-email"
-                    name="fromEmail"
-                    type="email"
-                    placeholder="volunteer@vanderpumpdogs.org"
-                    defaultValue={sendgridConfig?.sendgrid_from_email || ""}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sendgrid-from-name">From Name</Label>
-                  <Input
-                    id="sendgrid-from-name"
-                    name="fromName"
-                    type="text"
-                    placeholder="Vanderpump Dogs Foundation"
-                    defaultValue={sendgridConfig?.sendgrid_from_name || ""}
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch id="sendgrid-active" name="isActive" defaultChecked={sendgridConfig?.is_active || false} />
-                  <Label htmlFor="sendgrid-active">Enable SendGrid</Label>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit">Save Configuration</Button>
-                  {sendgridConfig && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={async () => {
-                          await handleValidateSendGrid(sendgridConfig.id)
-                        }}
-                      >
-                        Validate & Test
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={async () => {
-                          await handleDeleteConfig(sendgridConfig.id)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-
-                {sendgridConfig?.validation_error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{sendgridConfig.validation_error}</AlertDescription>
-                  </Alert>
-                )}
-              </form>
-            </CardContent>
-          </Card>
+          <SendGridForm config={sendgridConfig} />
         </TabsContent>
 
-        {/* Gmail OAuth Configuration */}
         <TabsContent value="gmail">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gmail OAuth Configuration</CardTitle>
-              <CardDescription>
-                Configure Gmail for sending emails using OAuth 2.0. Follow the{" "}
-                <a
-                  href="https://developers.google.com/gmail/api/guides/sending"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary underline"
-                >
-                  Gmail API setup guide
-                </a>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form action={handleSaveGmailConfig} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-client-id">OAuth Client ID</Label>
-                  <Input
-                    id="gmail-client-id"
-                    name="clientId"
-                    placeholder="xxxxx.apps.googleusercontent.com"
-                    defaultValue={gmailConfig?.gmail_client_id || ""}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-client-secret">OAuth Client Secret</Label>
-                  <Input
-                    id="gmail-client-secret"
-                    name="clientSecret"
-                    type="password"
-                    placeholder="GOCSPX-xxxxxxxxxxxxx"
-                    defaultValue={gmailConfig?.gmail_client_secret || ""}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-refresh-token">Refresh Token</Label>
-                  <Input
-                    id="gmail-refresh-token"
-                    name="refreshToken"
-                    type="password"
-                    placeholder="1//xxxxxxxxxxxxx"
-                    defaultValue={gmailConfig?.gmail_refresh_token || ""}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gmail-from-email">From Email (Gmail Address)</Label>
-                  <Input
-                    id="gmail-from-email"
-                    name="fromEmail"
-                    type="email"
-                    placeholder="volunteer@vanderpumpdogs.org"
-                    defaultValue={gmailConfig?.gmail_from_email || ""}
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch id="gmail-active" name="isActive" defaultChecked={gmailConfig?.is_active || false} />
-                  <Label htmlFor="gmail-active">Enable Gmail</Label>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit">Save Configuration</Button>
-                  {gmailConfig && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={async () => {
-                          await handleValidateGmail(gmailConfig.id)
-                        }}
-                      >
-                        Validate & Test
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={async () => {
-                          await handleDeleteConfig(gmailConfig.id)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-
-                {gmailConfig?.validation_error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{gmailConfig.validation_error}</AlertDescription>
-                  </Alert>
-                )}
-              </form>
-            </CardContent>
-          </Card>
+          <GmailForm config={gmailConfig} />
         </TabsContent>
       </Tabs>
 
