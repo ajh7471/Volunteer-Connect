@@ -11,4 +11,17 @@ import { createClient } from "./supabase/client"
  * import { supabase } from '@/lib/supabaseClient'
  * const { data, error } = await supabase.from('table').select()
  */
-export const supabase = createClient()
+
+let _supabaseInstance: ReturnType<typeof createClient> | null = null
+
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(target, prop) {
+    if (!_supabaseInstance) {
+      _supabaseInstance = createClient()
+    }
+    return (_supabaseInstance as any)[prop]
+  },
+})
+
+// Also export the create function for explicit usage
+export { createClient }
