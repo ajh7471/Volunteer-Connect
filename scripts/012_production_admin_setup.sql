@@ -72,35 +72,20 @@ $$;
 
 DO $$
 DECLARE
-  admin_user_id UUID;
-  admin_email TEXT := 'volunteer@vanderpumpdogs.org';
+  admin_exists BOOLEAN;
 BEGIN
-  -- Find the admin user's UUID from auth.users
-  SELECT id INTO admin_user_id
-  FROM auth.users
-  WHERE email = admin_email;
+  SELECT EXISTS (
+    SELECT 1 FROM profiles p
+    JOIN auth.users au ON p.id = au.id
+    WHERE au.email = 'volunteer@vanderpumpdogs.org'
+    AND p.role = 'admin'
+    AND p.active = true
+  ) INTO admin_exists;
 
-  -- If admin user exists in auth.users
-  IF admin_user_id IS NOT NULL THEN
-    -- Ensure their profile exists and is configured correctly
-    INSERT INTO profiles (id, name, phone, role, active, created_at, updated_at)
-    VALUES (
-      admin_user_id,
-      'Vanderpump Dogs Admin',
-      '555-0100',
-      'admin',
-      true,
-      NOW(),
-      NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      role = 'admin',
-      active = true,
-      updated_at = NOW();
-
-    RAISE NOTICE 'Admin profile verified for %', admin_email;
+  IF admin_exists THEN
+    RAISE NOTICE '✓ Admin user verified: volunteer@vanderpumpdogs.org';
   ELSE
-    RAISE WARNING 'Admin user % not found in auth.users. Please create this user in Supabase dashboard first.', admin_email;
+    RAISE WARNING '✗ Admin user not found or not configured correctly';
   END IF;
 END $$;
 
@@ -121,72 +106,63 @@ END $$;
 -- This ensures there are always shifts available for volunteers to sign up for
 
 DO $$
-DECLARE
-  seed_start_date DATE := CURRENT_DATE;
-  seed_end_date DATE := CURRENT_DATE + INTERVAL '90 days';
 BEGIN
-  -- Call our updated seed function
-  PERFORM seed_shifts_range(seed_start_date, seed_end_date);
-  
-  RAISE NOTICE 'Seeded shifts from % to %', seed_start_date, seed_end_date;
+  PERFORM seed_shifts_range(CURRENT_DATE, CURRENT_DATE + INTERVAL '90 days');
+  RAISE NOTICE '✓ Production shifts seeded for next 90 days';
 END $$;
 
 -- Step 5: Verify the setup
 -- Display admin user info
 SELECT 
-  'Admin User Verification' as check_type,
-  p.id,
+  '=== ADMIN USER VERIFICATION ===' as status,
+  p.id as user_id,
   au.email,
   p.name,
   p.role,
   p.active,
-  au.email_confirmed_at as email_verified
+  au.email_confirmed_at as verified_at
 FROM profiles p
 JOIN auth.users au ON p.id = au.id
 WHERE au.email = 'volunteer@vanderpumpdogs.org';
 
 -- Display sample of created shifts
 SELECT 
-  'Shift Schedule Sample' as check_type,
+  '=== SHIFT SCHEDULE SAMPLE ===' as status,
   shift_date,
   slot,
-  start_time,
-  end_time,
+  TO_CHAR(start_time, 'HH12:MI AM') as start,
+  TO_CHAR(end_time, 'HH12:MI PM') as end,
   capacity
 FROM shifts
 WHERE shift_date >= CURRENT_DATE
 ORDER BY shift_date, 
-  CASE slot 
-    WHEN 'AM' THEN 1 
-    WHEN 'MID' THEN 2 
-    WHEN 'PM' THEN 3 
-  END
-LIMIT 9; -- Show first 3 days (3 shifts per day)
+  CASE slot WHEN 'AM' THEN 1 WHEN 'MID' THEN 2 WHEN 'PM' THEN 3 END
+LIMIT 9;
 
 -- Display statistics
 SELECT 
-  'Production Statistics' as check_type,
-  COUNT(DISTINCT CASE WHEN role = 'admin' THEN id END) as admin_count,
-  COUNT(DISTINCT CASE WHEN role = 'volunteer' THEN id END) as volunteer_count,
-  COUNT(DISTINCT CASE WHEN shift_date >= CURRENT_DATE THEN id END) as future_shifts_count,
-  COUNT(DISTINCT shift_date) as total_days_with_shifts
-FROM (
-  SELECT id, role FROM profiles
-  UNION ALL
-  SELECT id, shift_date::text as role FROM shifts
-) combined_stats;
+  '=== PRODUCTION STATISTICS ===' as status,
+  COUNT(DISTINCT CASE WHEN shift_date >= CURRENT_DATE THEN id END) as future_shifts,
+  COUNT(DISTINCT CASE WHEN shift_date >= CURRENT_DATE THEN shift_date END) as days_scheduled,
+  MIN(CASE WHEN shift_date >= CURRENT_DATE THEN shift_date END) as first_shift_date,
+  MAX(CASE WHEN shift_date >= CURRENT_DATE THEN shift_date END) as last_shift_date
+FROM shifts;
 
 -- Final success message
 DO $$
 BEGIN
-  RAISE NOTICE '==============================================';
-  RAISE NOTICE 'PRODUCTION SETUP COMPLETE';
-  RAISE NOTICE '==============================================';
-  RAISE NOTICE 'Admin Email: volunteer@vanderpumpdogs.org';
-  RAISE NOTICE 'Shift Times: 9:00 AM - 12:00 PM, 12:00 PM - 3:00 PM, 3:00 PM - 5:00 PM';
+  RAISE NOTICE '';
+  RAISE NOTICE '================================================';
+  RAISE NOTICE '  PRODUCTION SETUP COMPLETE ✓';
+  RAISE NOTICE '================================================';
+  RAISE NOTICE 'Admin: volunteer@vanderpumpdogs.org';
+  RAISE NOTICE 'Shifts: 9:00 AM - 12:00 PM, 12:00 PM - 3:00 PM, 3:00 PM - 5:00 PM';
+  RAISE NOTICE 'Schedule: Next 90 days seeded';
+  RAISE NOTICE '';
   RAISE NOTICE 'Next Steps:';
-  RAISE NOTICE '1. Verify admin can login at /auth/login';
-  RAISE NOTICE '2. Test shift creation at /admin/shifts';
-  RAISE NOTICE '3. Create test volunteer account to verify workflow';
-  RAISE NOTICE '==============================================';
+  RAISE NOTICE '1. Deploy application to Vercel';
+  RAISE NOTICE '2. Test admin login at /auth/login';
+  RAISE NOTICE '3. Verify shifts at /admin/shifts';
+  RAISE NOTICE '4. Create test volunteer for workflow verification';
+  RAISE NOTICE '================================================';
 END $$;

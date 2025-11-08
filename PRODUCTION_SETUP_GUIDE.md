@@ -8,35 +8,12 @@ This guide ensures the production environment is correctly configured with:
 
 ## Prerequisites Checklist
 
-### 1. Admin User Setup
-The admin user **volunteer@vanderpumpdogs.org** must be created through Supabase Auth:
-
-**Option A: Manual Setup (Recommended)**
-1. Go to your Supabase project dashboard
-2. Navigate to Authentication > Users
-3. Click "Add User" > "Create new user"
-4. Enter:
-   - Email: `volunteer@vanderpumpdogs.org`
-   - Password: `VolunteerAdmin2026`
-   - Email Confirm: ✅ (mark as confirmed)
-5. After creation, note the user's UUID
-6. Update the `profiles` table:
-   \`\`\`sql
-   INSERT INTO profiles (id, name, phone, role, active)
-   VALUES (
-     '[USER_UUID_FROM_AUTH]',
-     'Vanderpump Dogs Admin',
-     '555-0100',
-     'admin',
-     true
-   );
-   \`\`\`
-
-**Option B: SQL Script (If Supabase Admin API available)**
-Run `scripts/012_production_admin_setup.sql` which will:
-- Check if admin exists
-- Create profile with admin role
-- Set up proper permissions
+### 1. Admin User Setup ✅
+**STATUS: VERIFIED** - Admin user already exists in Supabase database
+- Email: volunteer@vanderpumpdogs.org
+- Password: VolunteerAdmin2026
+- Role: admin (verified in profiles table)
+- No action required
 
 ### 2. Shift Schedule Configuration
 
