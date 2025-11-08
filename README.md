@@ -302,8 +302,29 @@ For issues or questions:
 This project is proprietary and confidential.
 © 2025 Vanderpump Dogs Foundation. All rights reserved.
 
+## 📖 Version History
+
+### v1.2 (Current Production) - January 2025
+- **Branch**: Vanderpump
+- **Deployment**: https://v0-volunteer-connect-git-vanderpump-bridgepathaisolutions.vercel.app/
+- **Features**: All 5 major features implemented (User Management, Email System, Reporting, UX Improvements, Advanced Shift Management)
+- **Test Coverage**: 94.1% (193/205 tests passing)
+- **Status**: ✅ Production Ready
+
+### v1.1 (Preview/Staging)
+- **Branch**: main
+- **Deployment**: https://volunteer-app-preview.vercel.app/
+- **Features**: Core volunteer management and scheduling
+- **Status**: 🔄 Preview Environment
+
+### Code Merge - November 8, 2025
+- Merged code between `main` and `Vanderpump` branches
+- Synchronized all features and bug fixes across branches
+- Unified codebase for streamlined development
+- Commits: ff2c573 (Vanderpump) and 99c7941 (main)
+
 ---
 
-**Last Updated**: December 2024  
+**Last Updated**: January 2025  
 **Version**: v1.2 (Production)  
 **Status**: ✅ Live and Operational
