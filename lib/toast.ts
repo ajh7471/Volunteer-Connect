@@ -30,3 +30,5 @@ export class ToastManager {
     this.show(message, "warning")
   }
 }
+
+export const toast = ToastManager
