@@ -22,11 +22,12 @@
 -- email_opt_in: Boolean flag indicating if user wants ANY emails at all
 -- Default is false (opt-out by default) to respect privacy laws like GDPR
 ALTER TABLE profiles 
-ADD COLUMN IF NOT EXISTS email_opt_in BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS email_opt_in BOOLEAN DEFAULT false;
 
 -- email_categories: JSON object storing granular email preferences
 -- Structure: {"reminders": true, "confirmations": true, "promotional": false, "urgent": true}
 -- This gives users fine-grained control over what types of emails they receive
+ALTER TABLE profiles
 ADD COLUMN IF NOT EXISTS email_categories JSONB DEFAULT '{"reminders": true, "confirmations": true, "promotional": false, "urgent": true}'::jsonb;
 
 -- ----------------------------------------------------------------------------
