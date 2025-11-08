@@ -174,7 +174,7 @@ CREATE OR REPLACE FUNCTION apply_shift_template(
 RETURNS TABLE(shifts_created INTEGER) AS $$
 DECLARE
   template_record RECORD;
-  current_date DATE;
+  current_date_var DATE; -- renamed from current_date to avoid conflict with PostgreSQL function
   day_of_week INTEGER;
   shifts_count INTEGER := 0;
 BEGIN
@@ -186,16 +186,16 @@ BEGIN
   END IF;
 
   -- Loop through date range
-  current_date := start_date_param;
-  WHILE current_date <= end_date_param LOOP
-    day_of_week := EXTRACT(DOW FROM current_date)::INTEGER;
+  current_date_var := start_date_param; -- using renamed variable
+  WHILE current_date_var <= end_date_param LOOP
+    day_of_week := EXTRACT(DOW FROM current_date_var)::INTEGER; -- using renamed variable
     
     -- Check if this day of week is in the template
     IF day_of_week = ANY(template_record.days_of_week) THEN
       -- Insert shift if it doesn't already exist
       INSERT INTO shifts (shift_date, slot, start_time, end_time, capacity)
       VALUES (
-        current_date,
+        current_date_var, -- using renamed variable
         template_record.slot,
         template_record.start_time,
         template_record.end_time,
@@ -208,7 +208,7 @@ BEGIN
       END IF;
     END IF;
     
-    current_date := current_date + INTERVAL '1 day';
+    current_date_var := current_date_var + INTERVAL '1 day'; -- using renamed variable
   END LOOP;
 
   RETURN QUERY SELECT shifts_count;
