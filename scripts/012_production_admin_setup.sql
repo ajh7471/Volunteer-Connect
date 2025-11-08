@@ -111,43 +111,6 @@ BEGIN
   RAISE NOTICE '✓ Production shifts seeded for next 90 days';
 END $$;
 
--- Step 5: Verify the setup
--- Display admin user info
-SELECT 
-  '=== ADMIN USER VERIFICATION ===' as status,
-  p.id as user_id,
-  au.email,
-  p.name,
-  p.role,
-  p.active,
-  au.email_confirmed_at as verified_at
-FROM profiles p
-JOIN auth.users au ON p.id = au.id
-WHERE au.email = 'volunteer@vanderpumpdogs.org';
-
--- Display sample of created shifts
-SELECT 
-  '=== SHIFT SCHEDULE SAMPLE ===' as status,
-  shift_date,
-  slot,
-  TO_CHAR(start_time, 'HH12:MI AM') as start,
-  TO_CHAR(end_time, 'HH12:MI PM') as end,
-  capacity
-FROM shifts
-WHERE shift_date >= CURRENT_DATE
-ORDER BY shift_date, 
-  CASE slot WHEN 'AM' THEN 1 WHEN 'MID' THEN 2 WHEN 'PM' THEN 3 END
-LIMIT 9;
-
--- Display statistics
-SELECT 
-  '=== PRODUCTION STATISTICS ===' as status,
-  COUNT(DISTINCT CASE WHEN shift_date >= CURRENT_DATE THEN id END) as future_shifts,
-  COUNT(DISTINCT CASE WHEN shift_date >= CURRENT_DATE THEN shift_date END) as days_scheduled,
-  MIN(CASE WHEN shift_date >= CURRENT_DATE THEN shift_date END) as first_shift_date,
-  MAX(CASE WHEN shift_date >= CURRENT_DATE THEN shift_date END) as last_shift_date
-FROM shifts;
-
 -- Final success message
 DO $$
 BEGIN
