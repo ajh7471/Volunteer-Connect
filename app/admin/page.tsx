@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/app/components/Toast"
+import Link from "next/link"
 
 type Profile = { id: string; name: string | null; phone: string | null }
 type Shift = { id: string; shift_date: string; slot: "AM" | "MID" | "PM"; capacity: number }
@@ -168,9 +169,14 @@ export default function AdminPage() {
   return (
     <RequireAuth>
       <main className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Admin — Day View & Directory</h1>
-          <p className="text-muted-foreground">Manage daily shifts and volunteer assignments</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Admin — Day View & Directory</h1>
+            <p className="text-muted-foreground">Manage daily shifts and volunteer assignments</p>
+          </div>
+          <Button asChild>
+            <Link href="/admin/volunteers">Manage Volunteers</Link>
+          </Button>
         </div>
 
         {isAdmin === null && <p className="text-muted-foreground">Checking access...</p>}
@@ -185,9 +191,9 @@ export default function AdminPage() {
           <>
             <Card>
               <CardContent className="pt-6 space-y-4">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <label className="text-sm font-medium">Select day</label>
-                  <Input type="date" className="w-48" value={day} onChange={(e) => setDay(e.target.value)} />
+                  <Input type="date" className="w-full sm:w-48" value={day} onChange={(e) => setDay(e.target.value)} />
                   {monthEmpty && (
                     <Button
                       onClick={seedMonth}
@@ -207,13 +213,21 @@ export default function AdminPage() {
                     {(["AM", "MID", "PM"] as const).map((slot) => {
                       const shift = shifts.find((s) => s.slot === slot)
                       const list = assignmentsByShift.get(shift?.id || "") || []
+                      const isFull = shift && list.length >= shift.capacity
+                      const isNearFull = shift && list.length === shift.capacity - 1
 
                       return (
                         <div key={slot} className="rounded-xl border bg-card p-3">
                           <div className="mb-2 flex items-center justify-between">
                             <div className="font-semibold">{slot}</div>
-                            <div className="text-sm text-muted-foreground">
+                            <div
+                              className={`text-sm font-medium ${
+                                isFull ? "text-red-600" : isNearFull ? "text-amber-600" : "text-muted-foreground"
+                              }`}
+                            >
                               {list.length}/{shift?.capacity ?? 2}
+                              {isFull && " (FULL)"}
+                              {isNearFull && " (1 left)"}
                             </div>
                           </div>
                           <ul className="space-y-2">
@@ -247,12 +261,20 @@ export default function AdminPage() {
                             })}
                           </ul>
                           <div className="mt-2">
-                            <DirectoryPicker
-                              vols={vols}
-                              onPick={(uid) => addTo(shift!.id, uid)}
-                              pendingAdd={pendingAdd}
-                              shiftId={shift?.id || ""}
-                            />
+                            {isFull ? (
+                              <Alert className="py-2">
+                                <AlertDescription className="text-xs">
+                                  Shift is at capacity. Remove a volunteer to add more.
+                                </AlertDescription>
+                              </Alert>
+                            ) : (
+                              <DirectoryPicker
+                                vols={vols}
+                                onPick={(uid) => addTo(shift!.id, uid)}
+                                pendingAdd={pendingAdd}
+                                shiftId={shift?.id || ""}
+                              />
+                            )}
                           </div>
                         </div>
                       )
