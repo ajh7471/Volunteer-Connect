@@ -1,24 +1,14 @@
 import { createClient } from "./supabase/client"
 
 /**
- * EDUCATIONAL COMMENT - Supabase Client Export
+ * Supabase Client Singleton Export
  *
- * This file provides a convenient way to import the Supabase client
- * throughout the application. Instead of calling createClient() everywhere,
- * we export a pre-created instance that all components can share.
+ * This file provides a single point of access to the Supabase client throughout the app.
+ * The actual singleton pattern is implemented in lib/supabase/client.ts to ensure
+ * only one client instance is ever created, preventing the "Multiple GoTrueClient instances" warning.
  *
- * USAGE:
- * import { supabase } from "@/lib/supabaseClient"
- * const { data } = await supabase.from('profiles').select()
- *
- * WHY THIS PATTERN:
- * - Consistent import path across the app
- * - No need to call createClient() manually in every file
- * - The singleton pattern in createClient() ensures only one instance
- *
- * @test-scope: client-export, import-consistency
+ * Usage:
+ * import { supabase } from '@/lib/supabaseClient'
+ * const { data, error } = await supabase.from('table').select()
  */
-
-// Create and export the singleton instance
-// This line executes once when the module is first imported
 export const supabase = createClient()
