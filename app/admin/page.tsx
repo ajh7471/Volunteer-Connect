@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Calendar, FileText, Settings } from "lucide-react"
+import { Users, Calendar, FileText, Settings, UserCog, Mail } from "lucide-react"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -110,7 +110,20 @@ export default function AdminDashboard() {
         </div>
 
         {/* Admin Actions */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card className="transition-shadow hover:shadow-lg">
+            <CardHeader>
+              <UserCog className="mb-2 h-8 w-8 text-primary" />
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>Create users, manage roles, and block emails</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link href="/admin/users">Manage Users</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="transition-shadow hover:shadow-lg">
             <CardHeader>
               <Users className="mb-2 h-8 w-8 text-primary" />
@@ -133,6 +146,19 @@ export default function AdminDashboard() {
             <CardContent>
               <Button asChild className="w-full">
                 <Link href="/admin/shifts">Manage Shifts</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="transition-shadow hover:shadow-lg">
+            <CardHeader>
+              <Mail className="mb-2 h-8 w-8 text-primary" />
+              <CardTitle>Email Communications</CardTitle>
+              <CardDescription>Send emails to opted-in volunteers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link href="/admin/emails">Manage Emails</Link>
               </Button>
             </CardContent>
           </Card>
