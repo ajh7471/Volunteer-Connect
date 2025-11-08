@@ -9,14 +9,14 @@ import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getEmailServiceConfigs } from "@/app/admin/email-service-actions"
 import {
-  saveSendGridConfig,
-  saveGmailConfig,
-  validateSendGridConfig,
-  validateGmailConfig,
-  getEmailServiceConfigs,
-  deleteEmailServiceConfig,
-} from "@/app/admin/email-service-actions"
+  handleSaveSendGridConfig,
+  handleSaveGmailConfig,
+  handleValidateSendGrid,
+  handleValidateGmail,
+  handleDeleteConfig,
+} from "./actions"
 import { AlertCircle, CheckCircle2, Mail, Settings, Trash2 } from "lucide-react"
 
 async function EmailServiceConfigurations() {
@@ -125,19 +125,7 @@ async function EmailServiceConfigurations() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form
-                action={async (formData: FormData) => {
-                  "use server"
-                  const result = await saveSendGridConfig({
-                    apiKey: formData.get("apiKey") as string,
-                    fromEmail: formData.get("fromEmail") as string,
-                    fromName: formData.get("fromName") as string,
-                    isActive: formData.get("isActive") === "on",
-                    priority: 1,
-                  })
-                }}
-                className="space-y-4"
-              >
+              <form action={handleSaveSendGridConfig} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="sendgrid-api-key">API Key</Label>
                   <Input
@@ -187,7 +175,7 @@ async function EmailServiceConfigurations() {
                         type="button"
                         variant="outline"
                         onClick={async () => {
-                          await validateSendGridConfig(sendgridConfig.id)
+                          await handleValidateSendGrid(sendgridConfig.id)
                         }}
                       >
                         Validate & Test
@@ -197,7 +185,7 @@ async function EmailServiceConfigurations() {
                         variant="destructive"
                         size="icon"
                         onClick={async () => {
-                          await deleteEmailServiceConfig(sendgridConfig.id)
+                          await handleDeleteConfig(sendgridConfig.id)
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -235,20 +223,7 @@ async function EmailServiceConfigurations() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form
-                action={async (formData: FormData) => {
-                  "use server"
-                  await saveGmailConfig({
-                    clientId: formData.get("clientId") as string,
-                    clientSecret: formData.get("clientSecret") as string,
-                    refreshToken: formData.get("refreshToken") as string,
-                    fromEmail: formData.get("fromEmail") as string,
-                    isActive: formData.get("isActive") === "on",
-                    priority: 2,
-                  })
-                }}
-                className="space-y-4"
-              >
+              <form action={handleSaveGmailConfig} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="gmail-client-id">OAuth Client ID</Label>
                   <Input
@@ -309,7 +284,7 @@ async function EmailServiceConfigurations() {
                         type="button"
                         variant="outline"
                         onClick={async () => {
-                          await validateGmailConfig(gmailConfig.id)
+                          await handleValidateGmail(gmailConfig.id)
                         }}
                       >
                         Validate & Test
@@ -319,7 +294,7 @@ async function EmailServiceConfigurations() {
                         variant="destructive"
                         size="icon"
                         onClick={async () => {
-                          await deleteEmailServiceConfig(gmailConfig.id)
+                          await handleDeleteConfig(gmailConfig.id)
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
