@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "build": "npm run test:pre-build && next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "test": "npm run test:regression",
+    "test:coverage": "npm run test:generate && npm run test:regression",
+    "test:generate": "node scripts/generate-tests-from-comments.ts",
+    "test:pre-build": "node scripts/run-regression-tests.ts",
+    "test:regression": "node scripts/run-regression-tests.ts",
+    "test:watch": "npm run test:regression -- --watch"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
