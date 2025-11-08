@@ -1,17 +1,15 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "./supabase/client"
 
-// Singleton pattern for Supabase client
-let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null
+// Create a singleton instance to prevent "Multiple GoTrueClient instances" warning
+let clientInstance: ReturnType<typeof createClient> | null = null
 
 export function getSupabase() {
-  if (!supabaseInstance) {
-    supabaseInstance = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
+  if (!clientInstance) {
+    console.log("[v0] Creating Supabase client singleton instance")
+    clientInstance = createClient()
   }
-  return supabaseInstance
+  return clientInstance
 }
 
-// Export for backwards compatibility
+// Export singleton for use throughout the app
 export const supabase = getSupabase()
