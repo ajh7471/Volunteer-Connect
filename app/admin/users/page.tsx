@@ -1,5 +1,18 @@
 "use client"
 
+/**
+ * ADMIN USER MANAGEMENT PAGE
+ *
+ * Comprehensive interface for managing user accounts including:
+ * - Creating new volunteer and admin accounts
+ * - Blocking and unblocking email addresses
+ * - Deleting user accounts with cascade cleanup
+ * - Changing user roles (volunteer ↔ admin)
+ * - Assigning and revoking shifts
+ *
+ * @test-scope: Admin user management - complete UI with all CRUD operations
+ */
+
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import RequireAuth from "@/app/components/RequireAuth"
@@ -19,7 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/lib/toast"
-import { UserPlus, Shield, Ban, Trash2 } from "lucide-react"
+import { UserPlus, Shield, Ban, Trash2, Calendar } from "lucide-react"
+import { createUserAccount, deleteUserAccount, updateUserRole, assignShiftToUser } from "../actions"
 
 type User = {
   id: string
@@ -38,6 +52,10 @@ export default function AdminUsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showBlockModal, setShowBlockModal] = useState(false)
   const [blockedEmails, setBlockedEmails] = useState<string[]>([])
+  const [showAssignShiftModal, setShowAssignShiftModal] = useState(false)
+  const [selectedUserForShift, setSelectedUserForShift] = useState<User | null>(null)
+  const [availableShifts, setAvailableShifts] = useState<any[]>([])
+  const [selectedShiftId, setSelectedShiftId] = useState("")
 
   // Create user form
   const [newUser, setNewUser] = useState({
@@ -55,6 +73,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     loadUsers()
     loadBlockedEmails()
+    loadAvailableShifts()
   }, [])
 
   async function loadUsers() {
@@ -87,26 +106,52 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function loadAvailableShifts() {
+    const today = new Date().toISOString().split("T")[0]
+    const { data: shifts } = await supabase
+      .from("shifts")
+      .select("*, shift_assignments(count)")
+      .gte("shift_date", today)
+      .order("shift_date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(50)
+
+    if (shifts) {
+      setAvailableShifts(shifts)
+    }
+  }
+
   async function handleCreateUser() {
     if (!newUser.email || !newUser.password || !newUser.name) {
       toast.error("Please fill in all required fields")
       return
     }
 
-    try {
-      // Check if email is blocked
-      if (blockedEmails.includes(newUser.email.toLowerCase())) {
-        toast.error("This email address is blocked")
-        return
-      }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newUser.email)) {
+      toast.error("Please enter a valid email address")
+      return
+    }
 
-      // Create user via Supabase Admin API would require server action
-      // For now, we'll show a message
-      toast.success("User creation requires server-side implementation. Please use signup page.")
+    if (newUser.password.length < 8) {
+      toast.error("Password must be at least 8 characters")
+      return
+    }
+
+    if (blockedEmails.includes(newUser.email.toLowerCase())) {
+      toast.error("This email address is blocked")
+      return
+    }
+
+    const result = await createUserAccount(newUser)
+
+    if (result.success) {
+      toast.success(`User ${newUser.name} created successfully`)
       setShowCreateModal(false)
       setNewUser({ email: "", password: "", name: "", phone: "", role: "volunteer" })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create user")
+      loadUsers()
+    } else {
+      toast.error(result.error || "Failed to create user")
     }
   }
 
@@ -153,32 +198,53 @@ export default function AdminUsersPage() {
   async function handleDeleteUser(userId: string, userName: string) {
     if (!confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) return
 
-    try {
-      // Delete user's shift assignments first
-      await supabase.from("shift_assignments").delete().eq("user_id", userId)
+    const result = await deleteUserAccount(userId)
 
-      // Delete profile
-      const { error } = await supabase.from("profiles").delete().eq("id", userId)
-
-      if (error) throw error
-
+    if (result.success) {
       toast.success("User deleted successfully")
       loadUsers()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete user")
+    } else {
+      toast.error(result.error || "Failed to delete user")
     }
   }
 
   async function handleToggleRole(userId: string, currentRole: string) {
     const newRole = currentRole === "admin" ? "volunteer" : "admin"
 
-    const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId)
+    if (currentRole === "admin") {
+      if (!confirm(`Are you sure you want to demote this user from admin to volunteer?`)) return
+    }
 
-    if (error) {
-      toast.error("Failed to update role")
-    } else {
+    const result = await updateUserRole(userId, newRole)
+
+    if (result.success) {
       toast.success(`User role updated to ${newRole}`)
       loadUsers()
+    } else {
+      toast.error(result.error || "Failed to update role")
+    }
+  }
+
+  function openAssignShiftModal(user: User) {
+    setSelectedUserForShift(user)
+    setSelectedShiftId("")
+    setShowAssignShiftModal(true)
+  }
+
+  async function handleAssignShift() {
+    if (!selectedUserForShift || !selectedShiftId) {
+      toast.error("Please select a shift")
+      return
+    }
+
+    const result = await assignShiftToUser(selectedUserForShift.id, selectedShiftId)
+
+    if (result.success) {
+      toast.success("Shift assigned successfully")
+      setShowAssignShiftModal(false)
+      loadAvailableShifts()
+    } else {
+      toast.error(result.error || "Failed to assign shift")
     }
   }
 
@@ -246,13 +312,27 @@ export default function AdminUsersPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => handleToggleRole(user.id, user.role)}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openAssignShiftModal(user)}
+                              title="Assign shift"
+                            >
+                              <Calendar className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleRole(user.id, user.role)}
+                              title="Toggle role"
+                            >
                               <Shield className="h-3 w-3" />
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => handleDeleteUser(user.id, user.name || "this user")}
+                              title="Delete user"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -389,6 +469,46 @@ export default function AdminUsersPage() {
               </Button>
               <Button variant="destructive" onClick={handleBlockEmail}>
                 Block Email
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showAssignShiftModal} onOpenChange={setShowAssignShiftModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Assign Shift to {selectedUserForShift?.name}</DialogTitle>
+              <DialogDescription>Select an available shift to assign to this volunteer</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="shift-select">Available Shifts</Label>
+                <Select value={selectedShiftId} onValueChange={setSelectedShiftId}>
+                  <SelectTrigger id="shift-select">
+                    <SelectValue placeholder="Select a shift" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableShifts.map((shift) => {
+                      const assignedCount = shift.shift_assignments?.[0]?.count || 0
+                      const spotsLeft = shift.capacity - assignedCount
+                      const isFull = spotsLeft <= 0
+
+                      return (
+                        <SelectItem key={shift.id} value={shift.id} disabled={isFull}>
+                          {shift.shift_date} • {shift.start_time} - {shift.end_time} ({spotsLeft} spots left)
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAssignShiftModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAssignShift} disabled={!selectedShiftId}>
+                Assign Shift
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -7,11 +7,12 @@ import { MonthlyGrid } from "@/components/calendar/MonthlyGrid"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, CalendarIcon, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock } from "lucide-react"
 import { addMonths, ymd } from "@/lib/date"
 import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStatus } from "@/lib/shifts"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
+import { joinWaitlist } from "@/app/admin/shift-management-actions"
 
 export default function CalendarPage() {
   const router = useRouter()
@@ -102,6 +103,22 @@ export default function CalendarPage() {
     }
   }
 
+  async function handleJoinWaitlist(shiftId: string) {
+    if (!userId) return
+
+    setSigningUp(true)
+    const result = await joinWaitlist(shiftId)
+
+    if (result.success) {
+      toast.success(`Joined waitlist! You're position #${result.position}`)
+      await loadMonthData()
+    } else {
+      toast.error(result.error || "Failed to join waitlist")
+    }
+
+    setSigningUp(false)
+  }
+
   // Get shifts for selected date
   const selectedDateShifts = selectedDate ? shifts.filter((s) => s.shift_date === ymd(selectedDate)) : []
 
@@ -172,7 +189,6 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* Shift Details Panel */}
           <div className="lg:col-span-1">
             {selectedDate ? (
               <Card>
@@ -195,6 +211,7 @@ export default function CalendarPage() {
                     <p className="text-sm text-muted-foreground">No shifts have been created for this date yet.</p>
                   )}
 
+                  {/* Display shifts in a clean single-line format per shift */}
                   {selectedDateShifts.map((shift) => {
                     const status = getCapacityStatus(shift.capacity, shift.assignments_count)
                     const isAssigned = userAssignments.has(shift.id)
@@ -202,17 +219,23 @@ export default function CalendarPage() {
                     const isPast = new Date(shift.shift_date) < new Date()
 
                     return (
-                      <div key={shift.id} className="rounded-lg border p-3 space-y-2">
+                      <div
+                        key={shift.id}
+                        className="rounded-lg border p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => {
+                          // Allow clicking on the card to interact with the shift
+                          if (!isPast && !isAssigned && !isFull) {
+                            handleSignUp(shift.id)
+                          }
+                        }}
+                      >
+                        {/* Single line showing shift time and status */}
                         <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">
-                              {shift.slot === "AM" && "Morning Shift"}
-                              {shift.slot === "MID" && "Midday Shift"}
-                              {shift.slot === "PM" && "Afternoon Shift"}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium text-sm">
                               {shift.start_time} - {shift.end_time}
-                            </p>
+                            </span>
                           </div>
                           <Badge
                             variant={
@@ -222,20 +245,23 @@ export default function CalendarPage() {
                                   ? "secondary"
                                   : "destructive"
                             }
+                            className="text-xs"
                           >
                             {shift.assignments_count}/{shift.capacity}
                           </Badge>
                         </div>
 
+                        {/* Action buttons */}
                         {!isPast && (
-                          <>
+                          <div className="flex gap-2">
                             {isAssigned ? (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="w-full bg-transparent"
-                                onClick={() => {
-                                  // Find assignment ID
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  // Find assignment ID and cancel
                                   supabase
                                     .from("shift_assignments")
                                     .select("id")
@@ -247,31 +273,54 @@ export default function CalendarPage() {
                                     })
                                 }}
                               >
-                                Cancel Signup
+                                Remove from Shift
+                              </Button>
+                            ) : isFull ? (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                disabled={signingUp}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleJoinWaitlist(shift.id)
+                                }}
+                              >
+                                {signingUp ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Joining...
+                                  </>
+                                ) : (
+                                  "Join Waitlist"
+                                )}
                               </Button>
                             ) : (
                               <Button
                                 size="sm"
                                 className="w-full"
-                                disabled={isFull || signingUp}
-                                onClick={() => handleSignUp(shift.id)}
+                                disabled={signingUp}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleSignUp(shift.id)
+                                }}
                               >
                                 {signingUp ? (
                                   <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Signing up...
                                   </>
-                                ) : isFull ? (
-                                  "Shift Full"
                                 ) : (
-                                  "Sign Up"
+                                  "Add to My Shifts"
                                 )}
                               </Button>
                             )}
-                          </>
+                          </div>
                         )}
 
-                        {isPast && <p className="text-xs text-muted-foreground">This shift has passed</p>}
+                        {isPast && (
+                          <p className="text-xs text-center text-muted-foreground italic">This shift has passed</p>
+                        )}
                       </div>
                     )
                   })}
@@ -279,8 +328,9 @@ export default function CalendarPage() {
               </Card>
             ) : (
               <Card>
-                <CardContent className="flex items-center justify-center py-12">
-                  <p className="text-sm text-muted-foreground">Click on a date to view shift details</p>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground">Click on a date to view and manage shifts</p>
                 </CardContent>
               </Card>
             )}

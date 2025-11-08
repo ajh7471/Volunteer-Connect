@@ -24,13 +24,21 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      setError(error.message)
+    if (authError) {
+      setError(authError.message)
       setLoading(false)
-    } else {
-      router.push("/calendar")
+    } else if (data.user) {
+      // Check user role in profiles table to determine redirect destination
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
+
+      // Redirect admin users to admin dashboard, volunteers to calendar
+      if (profile?.role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/calendar")
+      }
     }
   }
 
