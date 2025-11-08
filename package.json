@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "db:setup-production": "echo 'Run scripts/012_production_admin_setup.sql in Supabase SQL Editor'",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "test:generate": "tsx scripts/generate-tests-from-comments.ts",
+    "test:regression": "tsx scripts/run-regression-tests.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
