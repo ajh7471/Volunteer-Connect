@@ -219,7 +219,7 @@ export default function MySchedulePage() {
   }
 
   async function loadTeamMembers(shiftId: string) {
-    if (shiftTeamMembers[shiftId]) return // Already loaded
+    if (shiftTeamMembers[shiftId] || loadingTeamMembers.has(shiftId)) return
 
     setLoadingTeamMembers((prev) => new Set(prev).add(shiftId))
 
@@ -239,21 +239,22 @@ export default function MySchedulePage() {
       .eq("shift_id", shiftId)
       .neq("user_id", userId!) // Exclude current user
 
-    if (!error && data) {
-      const members = data
-        .filter((a: any) => a.profiles)
-        .map((a: any) => ({
-          id: a.profiles.id,
-          name: a.profiles.name || "Anonymous",
-          email: a.profiles.email,
-          phone: a.profiles.phone,
-        }))
+    const members =
+      !error && data
+        ? data
+            .filter((a: any) => a.profiles)
+            .map((a: any) => ({
+              id: a.profiles.id,
+              name: a.profiles.name || "Anonymous",
+              email: a.profiles.email,
+              phone: a.profiles.phone,
+            }))
+        : []
 
-      setShiftTeamMembers((prev) => ({
-        ...prev,
-        [shiftId]: members,
-      }))
-    }
+    setShiftTeamMembers((prev) => ({
+      ...prev,
+      [shiftId]: members,
+    }))
 
     setLoadingTeamMembers((prev) => {
       const newSet = new Set(prev)
@@ -368,6 +369,7 @@ export default function MySchedulePage() {
               const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
               const teamMembers = shiftTeamMembers[assignment.shift_id]
               const isLoadingTeam = loadingTeamMembers.has(assignment.shift_id)
+              const hasLoadedTeam = teamMembers !== undefined
 
               return (
                 <Card key={assignment.id}>
@@ -398,10 +400,11 @@ export default function MySchedulePage() {
                         size="sm"
                         className="w-full justify-start gap-2 h-auto py-2 px-2"
                         onClick={() => loadTeamMembers(assignment.shift_id)}
+                        disabled={isLoadingTeam}
                       >
                         <Users className="h-4 w-4" />
                         <span className="text-xs font-medium">
-                          {teamMembers ? "Your Team Members" : "View Team Members"}
+                          {hasLoadedTeam ? "Your Team Members" : "View Team Members"}
                         </span>
                       </Button>
 
@@ -411,12 +414,15 @@ export default function MySchedulePage() {
                         </div>
                       )}
 
-                      {teamMembers && (
+                      {hasLoadedTeam && !isLoadingTeam && (
                         <div className="mt-2 space-y-2">
                           {teamMembers.length === 0 ? (
-                            <p className="text-xs text-muted-foreground text-center py-2">
-                              You're the only one signed up so far
-                            </p>
+                            <div className="bg-muted/30 rounded-md p-3 text-center">
+                              <Users className="h-5 w-5 text-muted-foreground mx-auto mb-1" />
+                              <p className="text-xs text-muted-foreground">
+                                No other volunteers have signed up yet. You'll be the first on your team!
+                              </p>
+                            </div>
                           ) : (
                             teamMembers.map((member) => (
                               <div key={member.id} className="bg-muted/50 rounded-md p-2 space-y-1">
