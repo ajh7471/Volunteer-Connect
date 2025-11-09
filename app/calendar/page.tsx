@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock, Users } from "lucide-react"
-import { addMonths, ymd } from "@/lib/date"
+import { addMonths, ymd, parseDate } from "@/lib/date"
 import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStatus } from "@/lib/shifts"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
@@ -176,7 +176,7 @@ export default function CalendarPage() {
         if (s.shift_date !== ymd(selectedDate)) return false
 
         const now = new Date()
-        const shiftDate = new Date(s.shift_date)
+        const shiftDate = parseDate(s.shift_date)
         const [hours, minutes] = s.end_time.split(":").map(Number)
         const shiftEndTime = new Date(
           shiftDate.getFullYear(),

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, Clock, Loader2, Users, CalendarPlus } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
-import { ymd } from "@/lib/date"
+import { ymd, parseDate } from "@/lib/date"
 import { toast } from "@/lib/toast"
 import Link from "next/link"
 import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
@@ -189,13 +189,27 @@ export default function MySchedulePage() {
   }
 
   async function handleAddToCalendar(assignment: Assignment) {
+    const shiftDate = parseDate(assignment.shift_date)
+    const [startHour, startMin] = assignment.start_time.split(":").map(Number)
+    const [endHour, endMin] = assignment.end_time.split(":").map(Number)
+
+    const startDateTime = new Date(
+      shiftDate.getFullYear(),
+      shiftDate.getMonth(),
+      shiftDate.getDate(),
+      startHour,
+      startMin,
+    )
+
+    const endDateTime = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), endHour, endMin)
+
     const event: CalendarEvent = {
       id: assignment.id,
       summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
-      description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}\nDate: ${new Date(assignment.shift_date).toLocaleDateString()}`,
+      description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}\nDate: ${parseDate(assignment.shift_date).toLocaleDateString()}`,
       location: "Vanderpump Dogs, Los Angeles, CA",
-      startDate: new Date(`${assignment.shift_date}T${assignment.start_time}`),
-      endDate: new Date(`${assignment.shift_date}T${assignment.end_time}`),
+      startDate: startDateTime,
+      endDate: endDateTime,
     }
 
     const icsContent = generateICS([event])
@@ -204,14 +218,30 @@ export default function MySchedulePage() {
   }
 
   async function handleAddAllToCalendar() {
-    const events: CalendarEvent[] = assignments.map((assignment) => ({
-      id: assignment.id,
-      summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
-      description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}`,
-      location: "Vanderpump Dogs, Los Angeles, CA",
-      startDate: new Date(`${assignment.shift_date}T${assignment.start_time}`),
-      endDate: new Date(`${assignment.shift_date}T${assignment.end_time}`),
-    }))
+    const events: CalendarEvent[] = assignments.map((assignment) => {
+      const shiftDate = parseDate(assignment.shift_date)
+      const [startHour, startMin] = assignment.start_time.split(":").map(Number)
+      const [endHour, endMin] = assignment.end_time.split(":").map(Number)
+
+      const startDateTime = new Date(
+        shiftDate.getFullYear(),
+        shiftDate.getMonth(),
+        shiftDate.getDate(),
+        startHour,
+        startMin,
+      )
+
+      const endDateTime = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), endHour, endMin)
+
+      return {
+        id: assignment.id,
+        summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
+        description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}`,
+        location: "Vanderpump Dogs, Los Angeles, CA",
+        startDate: startDateTime,
+        endDate: endDateTime,
+      }
+    })
 
     const icsContent = generateICS(events)
     downloadICS(icsContent, "vanderpump-volunteer-shifts.ics")
@@ -307,7 +337,7 @@ export default function MySchedulePage() {
             <CardContent>
               <div className="space-y-3">
                 {waitlistEntries.map((entry) => {
-                  const date = new Date(entry.shift_date)
+                  const date = parseDate(entry.shift_date)
                   const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
                   const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
 
@@ -364,7 +394,7 @@ export default function MySchedulePage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {assignments.map((assignment) => {
-              const date = new Date(assignment.shift_date)
+              const date = parseDate(assignment.shift_date)
               const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
               const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
               const teamMembers = shiftTeamMembers[assignment.shift_id]

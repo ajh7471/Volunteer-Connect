@@ -47,3 +47,14 @@ export function isSameMonth(a: Date, b: Date) {
 export function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
+
+export function parseDate(dateString: string): Date {
+  // Parse date string as local date (YYYY-MM-DD) without timezone conversion
+  const [year, month, day] = dateString.split("-").map(Number)
+  return new Date(year, month - 1, day)
+}
+
+export function formatDateForDisplay(dateString: string, options?: Intl.DateTimeFormatOptions): string {
+  const date = parseDate(dateString)
+  return date.toLocaleDateString("default", options)
+}

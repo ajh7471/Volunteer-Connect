@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, Loader2, ArrowRight, Award } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
-import { ymd } from "@/lib/date"
+import { ymd, parseDate } from "@/lib/date"
 
 type UpcomingShift = {
   id: string
@@ -218,7 +218,7 @@ export default function VolunteerDashboard() {
             ) : (
               <div className="space-y-3">
                 {thisMonthShifts.map((shift, index) => {
-                  const date = new Date(shift.shift_date)
+                  const date = parseDate(shift.shift_date)
                   const isNextShift = stats.nextShift?.id === shift.id
                   const today = new Date()
                   const isToday = date.toDateString() === today.toDateString()
