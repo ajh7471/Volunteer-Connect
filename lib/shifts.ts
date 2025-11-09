@@ -37,17 +37,25 @@ export async function getMonthShifts(year: number, month: number): Promise<Shift
     return []
   }
 
-  // Get assignment counts for each shift
+  // Get assignment counts for each shift using a proper select query
   const shiftsWithCounts = await Promise.all(
     (shifts || []).map(async (shift) => {
-      const { count } = await supabase
+      const { data: assignments, error: assignmentError } = await supabase
         .from("shift_assignments")
-        .select("id", { count: "exact", head: true })
+        .select("id")
         .eq("shift_id", shift.id)
+
+      if (assignmentError) {
+        console.error("[v0] Error fetching assignments for shift:", shift.id, assignmentError)
+      }
+
+      const count = assignments?.length || 0
+
+      console.log("[v0] Shift", shift.shift_date, shift.start_time, "- Count:", count, "Capacity:", shift.capacity)
 
       return {
         ...shift,
-        assignments_count: count || 0,
+        assignments_count: count,
       }
     }),
   )
