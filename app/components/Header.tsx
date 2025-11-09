@@ -46,10 +46,10 @@ export default function Header() {
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 md:flex">
             <NavLink href="/" label="Home" />
+            {userId && role === "volunteer" && <NavLink href="/volunteer" label="Dashboard" />}
             {userId && <NavLink href="/calendar" label="Calendar" />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" />}
             {userId && <NavLink href="/profile" label="Profile" />}
-            {/* </CHANGE> */}
             {role === "admin" && <NavLink href="/admin" label="Admin" />}
           </nav>
 
@@ -83,10 +83,12 @@ export default function Header() {
         {mobileMenuOpen && (
           <nav className="flex flex-col gap-2 py-4 md:hidden">
             <NavLink href="/" label="Home" onClick={() => setMobileMenuOpen(false)} />
+            {userId && role === "volunteer" && (
+              <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} />
+            )}
             {userId && <NavLink href="/calendar" label="Calendar" onClick={() => setMobileMenuOpen(false)} />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" onClick={() => setMobileMenuOpen(false)} />}
             {userId && <NavLink href="/profile" label="Profile" onClick={() => setMobileMenuOpen(false)} />}
-            {/* </CHANGE> */}
             {role === "admin" && <NavLink href="/admin" label="Admin" onClick={() => setMobileMenuOpen(false)} />}
             <div className="mt-2 flex flex-col gap-2">
               {userId ? (

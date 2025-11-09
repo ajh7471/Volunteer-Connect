@@ -7,7 +7,7 @@ import { MonthlyGrid } from "@/components/calendar/MonthlyGrid"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock, Users } from "lucide-react"
 import { addMonths, ymd } from "@/lib/date"
 import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStatus } from "@/lib/shifts"
 import { supabase } from "@/lib/supabaseClient"
@@ -22,7 +22,9 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [userAssignments, setUserAssignments] = useState<Set<string>>(new Set())
-  const [signingUp, setSigningUp] = useState(false)
+  const [signingUpShifts, setSigningUpShifts] = useState<Set<string>>(new Set())
+  const [shiftAttendees, setShiftAttendees] = useState<Record<string, Array<{ name: string; id: string }>>>({})
+  const [loadingAttendees, setLoadingAttendees] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadUser()
@@ -72,10 +74,50 @@ export default function CalendarPage() {
     setSelectedDate(date)
   }
 
+  async function loadShiftAttendees(shiftId: string) {
+    if (shiftAttendees[shiftId]) return // Already loaded
+
+    setLoadingAttendees((prev) => new Set(prev).add(shiftId))
+
+    const { data, error } = await supabase
+      .from("shift_assignments")
+      .select(
+        `
+        user_id,
+        profiles (
+          name,
+          id
+        )
+      `,
+      )
+      .eq("shift_id", shiftId)
+
+    if (!error && data) {
+      const attendeesList = data
+        .filter((a: any) => a.profiles?.name)
+        .map((a: any) => ({
+          name: a.profiles.name,
+          id: a.profiles.id,
+        }))
+
+      setShiftAttendees((prev) => ({
+        ...prev,
+        [shiftId]: attendeesList,
+      }))
+    }
+
+    setLoadingAttendees((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(shiftId)
+      return newSet
+    })
+  }
+
   async function handleSignUp(shiftId: string) {
     if (!userId) return
 
-    setSigningUp(true)
+    setSigningUpShifts((prev) => new Set(prev).add(shiftId))
+
     const result = await signUpForShift(shiftId, userId)
 
     if (result.success) {
@@ -86,7 +128,11 @@ export default function CalendarPage() {
       toast.error(result.error || "Failed to sign up")
     }
 
-    setSigningUp(false)
+    setSigningUpShifts((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(shiftId)
+      return newSet
+    })
   }
 
   async function handleCancel(assignmentId: string) {
@@ -106,7 +152,8 @@ export default function CalendarPage() {
   async function handleJoinWaitlist(shiftId: string) {
     if (!userId) return
 
-    setSigningUp(true)
+    setSigningUpShifts((prev) => new Set(prev).add(shiftId))
+
     const result = await joinWaitlist(shiftId)
 
     if (result.success) {
@@ -116,7 +163,11 @@ export default function CalendarPage() {
       toast.error(result.error || "Failed to join waitlist")
     }
 
-    setSigningUp(false)
+    setSigningUpShifts((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(shiftId)
+      return newSet
+    })
   }
 
   // Get shifts for selected date
@@ -211,24 +262,18 @@ export default function CalendarPage() {
                     <p className="text-sm text-muted-foreground">No shifts have been created for this date yet.</p>
                   )}
 
-                  {/* Display shifts in a clean single-line format per shift */}
+                  {/* Display shifts */}
                   {selectedDateShifts.map((shift) => {
                     const status = getCapacityStatus(shift.capacity, shift.assignments_count)
                     const isAssigned = userAssignments.has(shift.id)
                     const isFull = status === "full"
                     const isPast = new Date(shift.shift_date) < new Date()
+                    const isSigningUp = signingUpShifts.has(shift.id)
+                    const attendees = shiftAttendees[shift.id]
+                    const isLoadingAttendees = loadingAttendees.has(shift.id)
 
                     return (
-                      <div
-                        key={shift.id}
-                        className="rounded-lg border p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => {
-                          // Allow clicking on the card to interact with the shift
-                          if (!isPast && !isAssigned && !isFull) {
-                            handleSignUp(shift.id)
-                          }
-                        }}
-                      >
+                      <div key={shift.id} className="rounded-lg border p-4 space-y-3 hover:shadow-md transition-shadow">
                         {/* Single line showing shift time and status */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -250,6 +295,44 @@ export default function CalendarPage() {
                             {shift.assignments_count}/{shift.capacity}
                           </Badge>
                         </div>
+
+                        {shift.assignments_count > 0 && (
+                          <div className="space-y-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start gap-2 h-auto py-2"
+                              onClick={() => loadShiftAttendees(shift.id)}
+                            >
+                              <Users className="h-4 w-4" />
+                              <span className="text-xs">
+                                {attendees
+                                  ? `${attendees.length} volunteer${attendees.length !== 1 ? "s" : ""} signed up`
+                                  : `View ${shift.assignments_count} volunteer${shift.assignments_count !== 1 ? "s" : ""}`}
+                              </span>
+                            </Button>
+
+                            {isLoadingAttendees && (
+                              <div className="flex items-center justify-center py-2">
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              </div>
+                            )}
+
+                            {attendees && attendees.length > 0 && (
+                              <div className="ml-2 space-y-1">
+                                {attendees.map((attendee) => (
+                                  <div
+                                    key={attendee.id}
+                                    className="text-xs text-muted-foreground flex items-center gap-1"
+                                  >
+                                    <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                                    {attendee.name}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Action buttons */}
                         {!isPast && (
@@ -280,13 +363,13 @@ export default function CalendarPage() {
                                 variant="secondary"
                                 size="sm"
                                 className="w-full"
-                                disabled={signingUp}
+                                disabled={isSigningUp}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleJoinWaitlist(shift.id)
                                 }}
                               >
-                                {signingUp ? (
+                                {isSigningUp ? (
                                   <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Joining...
@@ -299,13 +382,13 @@ export default function CalendarPage() {
                               <Button
                                 size="sm"
                                 className="w-full"
-                                disabled={signingUp}
+                                disabled={isSigningUp}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleSignUp(shift.id)
                                 }}
                               >
-                                {signingUp ? (
+                                {isSigningUp ? (
                                   <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Signing up...

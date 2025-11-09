@@ -1,9 +1,55 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, Clock, Users } from "lucide-react"
+import { Calendar, Clock, Users, Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function HomePage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [role, setRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    checkAuthAndRedirect()
+  }, [])
+
+  async function checkAuthAndRedirect() {
+    const { data } = await supabase.auth.getUser()
+    const uid = data.user?.id
+
+    if (uid) {
+      // Get user role
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", uid).single()
+
+      if (profile) {
+        setUserId(uid)
+        setRole(profile.role)
+
+        if (profile.role === "admin") {
+          router.push("/admin")
+        } else {
+          router.push("/volunteer")
+        }
+        return
+      }
+    }
+
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-12 py-12">
       {/* Hero Section */}
