@@ -5,13 +5,13 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Loader2, ArrowRightLeft, Users, CalendarPlus } from "lucide-react"
+import { Calendar, Clock, Loader2, Users, CalendarPlus } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd } from "@/lib/date"
 import { toast } from "@/lib/toast"
 import Link from "next/link"
 import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
-import { requestShiftSwap, leaveWaitlist, acceptWaitlistSpot } from "@/app/admin/shift-management-actions"
+import { leaveWaitlist, acceptWaitlistSpot } from "@/app/admin/shift-management-actions"
 
 type Assignment = {
   id: string
@@ -150,19 +150,6 @@ export default function MySchedulePage() {
     } else {
       toast.success("Signup cancelled successfully")
       await loadAssignments()
-    }
-  }
-
-  async function handleRequestSwap(assignmentId: string) {
-    const message = prompt("Enter an optional message for your swap request:")
-    if (message === null) return // User cancelled
-
-    const result = await requestShiftSwap(assignmentId, null, message || undefined)
-
-    if (result.success) {
-      toast.success("Swap request created! Other volunteers will be notified.")
-    } else {
-      toast.error(result.error || "Failed to create swap request")
     }
   }
 
@@ -349,26 +336,15 @@ export default function MySchedulePage() {
                         {assignment.start_time} - {assignment.end_time}
                       </span>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 bg-transparent"
-                        onClick={() => handleAddToCalendar(assignment)}
-                      >
-                        <CalendarPlus className="mr-2 h-4 w-4" />
-                        Add to Calendar
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 bg-transparent"
-                        onClick={() => handleRequestSwap(assignment.id)}
-                      >
-                        <ArrowRightLeft className="mr-2 h-4 w-4" />
-                        Swap
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full bg-transparent"
+                      onClick={() => handleAddToCalendar(assignment)}
+                    >
+                      <CalendarPlus className="mr-2 h-4 w-4" />
+                      Add to Calendar
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
