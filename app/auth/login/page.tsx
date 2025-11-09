@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,7 +31,14 @@ export default function LoginPage() {
 
     if (authError) {
       console.error("[v0] Login: Auth error:", authError)
-      setError(authError.message)
+
+      if (authError.message.includes("Invalid login credentials") || authError.message.includes("invalid")) {
+        setError("The password you entered is incorrect. Please check your credentials and try again.")
+      } else if (authError.message.includes("Email not confirmed")) {
+        setError("Please verify your email address before logging in. Check your inbox for a confirmation link.")
+      } else {
+        setError("Unable to sign in. Please check your email and password and try again.")
+      }
       setLoading(false)
     } else if (data.user) {
       console.log("[v0] Login: User authenticated:", data.user.id)
@@ -59,8 +67,19 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+              <Alert variant="destructive" className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="ml-2">
+                  <p className="font-medium mb-1">{error}</p>
+                  {error.includes("password") && (
+                    <p className="text-sm mt-2">
+                      Need help?{" "}
+                      <Link href="/auth/forgot" className="font-medium underline hover:text-red-800">
+                        Reset your password
+                      </Link>
+                    </p>
+                  )}
+                </AlertDescription>
               </Alert>
             )}
 
