@@ -64,6 +64,27 @@ export async function getMonthShifts(year: number, month: number): Promise<Shift
 }
 
 export async function signUpForShift(shiftId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  console.log("[v0] signUpForShift - shiftId:", shiftId, "userId:", userId)
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (profileError) {
+    console.error("[v0] Error checking user profile:", profileError)
+    return { success: false, error: "Error verifying user profile" }
+  }
+
+  if (!profile) {
+    console.error("[v0] User profile not found for user_id:", userId)
+    return {
+      success: false,
+      error: "User profile not found. Please contact an administrator to complete your registration.",
+    }
+  }
+
   // Check if already signed up
   const { data: existing } = await supabase
     .from("shift_assignments")
@@ -89,12 +110,15 @@ export async function signUpForShift(shiftId: string, userId: string): Promise<{
   }
 
   // Insert assignment
+  console.log("[v0] Inserting shift assignment - shift_id:", shiftId, "user_id:", userId)
   const { error } = await supabase.from("shift_assignments").insert({ shift_id: shiftId, user_id: userId })
 
   if (error) {
+    console.error("[v0] Error inserting shift assignment:", error)
     return { success: false, error: error.message }
   }
 
+  console.log("[v0] Successfully signed up for shift")
   return { success: true }
 }
 
