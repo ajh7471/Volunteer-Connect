@@ -6,7 +6,7 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, TrendingUp, Loader2, ArrowRight } from "lucide-react"
+import { Calendar, Clock, TrendingUp, Loader2, ArrowRight, CheckCircle2 } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd } from "@/lib/date"
 
@@ -25,6 +25,8 @@ export default function VolunteerDashboard() {
     totalUpcoming: 0,
     thisMonth: 0,
     nextShift: null as UpcomingShift | null,
+    completedShiftsThisMonth: 0,
+    totalHoursThisMonth: 0,
   })
 
   useEffect(() => {
@@ -46,7 +48,6 @@ export default function VolunteerDashboard() {
     const startOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
     const endOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0))
 
-    // Get upcoming shifts
     const { data: assignments } = await supabase
       .from("shift_assignments")
       .select(
@@ -63,6 +64,43 @@ export default function VolunteerDashboard() {
       )
       .eq("user_id", userId)
 
+    const { data: completedAssignments } = await supabase
+      .from("shift_assignments")
+      .select(
+        `
+        id,
+        status,
+        shifts (
+          shift_date,
+          start_time,
+          end_time
+        )
+      `,
+      )
+      .eq("user_id", userId)
+      .eq("status", "completed")
+
+    let completedCount = 0
+    let totalHours = 0
+
+    if (completedAssignments) {
+      completedAssignments.forEach((assignment: any) => {
+        const shiftDate = assignment.shifts?.shift_date
+        if (shiftDate && shiftDate >= startOfMonth && shiftDate <= endOfMonth) {
+          completedCount++
+
+          const start = assignment.shifts.start_time
+          const end = assignment.shifts.end_time
+          if (start && end) {
+            const [startHour, startMin] = start.split(":").map(Number)
+            const [endHour, endMin] = end.split(":").map(Number)
+            const hours = endHour - startHour + (endMin - startMin) / 60
+            totalHours += hours
+          }
+        }
+      })
+    }
+
     if (assignments) {
       const upcoming = assignments
         .filter((a: any) => a.shifts?.shift_date >= today)
@@ -75,7 +113,7 @@ export default function VolunteerDashboard() {
         }))
         .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
-      setUpcomingShifts(upcoming.slice(0, 3)) // Show only first 3
+      setUpcomingShifts(upcoming.slice(0, 3))
 
       const thisMonthCount = upcoming.filter((s) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth).length
 
@@ -83,6 +121,8 @@ export default function VolunteerDashboard() {
         totalUpcoming: upcoming.length,
         thisMonth: thisMonthCount,
         nextShift: upcoming[0] || null,
+        completedShiftsThisMonth: completedCount,
+        totalHoursThisMonth: Math.round(totalHours * 10) / 10,
       })
     }
 
@@ -102,13 +142,11 @@ export default function VolunteerDashboard() {
   return (
     <RequireAuth>
       <div className="space-y-6">
-        {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Volunteer Dashboard</h1>
           <p className="text-muted-foreground">Welcome back! Here's your volunteer overview</p>
         </div>
 
-        {/* Quick Actions */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <CardHeader>
@@ -141,7 +179,6 @@ export default function VolunteerDashboard() {
           </Card>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -162,6 +199,17 @@ export default function VolunteerDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{stats.thisMonth}</div>
               <p className="text-xs text-muted-foreground">Shifts scheduled</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed This Month</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.completedShiftsThisMonth}</div>
+              <p className="text-xs text-muted-foreground">{stats.totalHoursThisMonth} hours worked</p>
             </CardContent>
           </Card>
 
@@ -193,7 +241,6 @@ export default function VolunteerDashboard() {
           </Card>
         </div>
 
-        {/* Next Shift Preview */}
         {stats.nextShift && (
           <Card>
             <CardHeader>
@@ -232,7 +279,6 @@ export default function VolunteerDashboard() {
           </Card>
         )}
 
-        {/* Recent Shifts */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
