@@ -41,12 +41,11 @@ export async function middleware(request: NextRequest) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
     if (profile?.role !== "admin") {
-      return NextResponse.redirect(new URL("/calendar", request.url))
+      return NextResponse.redirect(new URL("/volunteer", request.url))
     }
   }
 
-  // Protect authenticated routes
-  const protectedRoutes = ["/calendar", "/my-schedule"]
+  const protectedRoutes = ["/calendar", "/my-schedule", "/profile", "/volunteer"]
   if (protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))) {
     if (!user) {
       return NextResponse.redirect(new URL("/auth/login", request.url))
@@ -57,5 +56,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/calendar/:path*", "/my-schedule/:path*"],
+  matcher: ["/admin/:path*", "/calendar/:path*", "/my-schedule/:path*", "/profile/:path*", "/volunteer/:path*"],
 }

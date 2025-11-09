@@ -39,8 +39,21 @@ export function useSessionRole() {
     }
 
     load()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+        // Reload user data when auth state changes
+        await load()
+      }
+    })
+
     return () => {
       mounted = false
+      subscription.unsubscribe()
     }
   }, [])
 

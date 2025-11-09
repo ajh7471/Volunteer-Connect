@@ -33,12 +33,14 @@ export default function LoginPage() {
       // Check user role in profiles table to determine redirect destination
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
 
-      // Redirect admin users to admin dashboard, volunteers to calendar
       if (profile?.role === "admin") {
         router.push("/admin")
       } else {
-        router.push("/calendar")
+        router.push("/volunteer")
       }
+
+      // Force a page refresh to update header navigation
+      router.refresh()
     }
   }
 
