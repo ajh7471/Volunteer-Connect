@@ -29,8 +29,6 @@ export default function Header() {
   const r = useRouter()
   const { userId, role, loading } = useSessionRole()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const pathname = usePathname()
-  const isHomePage = pathname === "/"
 
   console.log("[v0] Header render - userId:", userId, "role:", role, "loading:", loading)
 
@@ -52,14 +50,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 md:flex">
-            {!userId && !isHomePage && <NavLink href="/" label="Home" />}
-            {!userId && (
-              <>
-                <NavLink href="/#about" label="About" />
-                <NavLink href="/#services" label="Services" />
-                <NavLink href="/#contact" label="Contact" />
-              </>
-            )}
+            <NavLink href="/" label="Home" />
             {userId && role === "volunteer" && <NavLink href="/volunteer" label="Dashboard" />}
             {userId && <NavLink href="/calendar" label="Calendar" />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" />}
@@ -96,14 +87,7 @@ export default function Header() {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <nav className="flex flex-col gap-2 py-4 md:hidden">
-            {!userId && !isHomePage && <NavLink href="/" label="Home" onClick={() => setMobileMenuOpen(false)} />}
-            {!userId && (
-              <>
-                <NavLink href="/#about" label="About" onClick={() => setMobileMenuOpen(false)} />
-                <NavLink href="/#services" label="Services" onClick={() => setMobileMenuOpen(false)} />
-                <NavLink href="/#contact" label="Contact" onClick={() => setMobileMenuOpen(false)} />
-              </>
-            )}
+            <NavLink href="/" label="Home" onClick={() => setMobileMenuOpen(false)} />
             {userId && role === "volunteer" && (
               <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} />
             )}

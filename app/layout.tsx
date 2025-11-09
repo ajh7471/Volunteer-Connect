@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import Header from "./components/Header"
 import ToastContainer from "./components/ToastContainer"
+import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -37,6 +38,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} ${jetbrainsMono.variable} min-h-dvh bg-background font-sans antialiased`}>
         <Header />
+        <div className="border-b bg-muted/30">
+          <div className="container mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
+            <BreadcrumbNav />
+          </div>
+        </div>
         <main className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         <ToastContainer />
       </body>
