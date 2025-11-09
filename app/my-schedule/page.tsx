@@ -5,13 +5,12 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Loader2, ArrowRightLeft, Users } from "lucide-react"
+import { Calendar, Clock, Loader2, ArrowRightLeft, Users, CalendarPlus } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd } from "@/lib/date"
 import { toast } from "@/lib/toast"
 import Link from "next/link"
 import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
-import { Download } from "lucide-react"
 import { requestShiftSwap, leaveWaitlist, acceptWaitlistSpot } from "@/app/admin/shift-management-actions"
 
 type Assignment = {
@@ -193,7 +192,7 @@ export default function MySchedulePage() {
     }
   }
 
-  async function handleExportShift(assignment: Assignment) {
+  async function handleAddToCalendar(assignment: Assignment) {
     const event: CalendarEvent = {
       id: assignment.id,
       summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
@@ -205,10 +204,10 @@ export default function MySchedulePage() {
 
     const icsContent = generateICS([event])
     downloadICS(icsContent, `volunteer-shift-${assignment.shift_date}.ics`)
-    toast.success("Shift exported to calendar!")
+    toast.success("Calendar file downloaded! Open it to add to Gmail, Outlook, or any calendar app.")
   }
 
-  async function handleExportAll() {
+  async function handleAddAllToCalendar() {
     const events: CalendarEvent[] = assignments.map((assignment) => ({
       id: assignment.id,
       summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
@@ -220,7 +219,7 @@ export default function MySchedulePage() {
 
     const icsContent = generateICS(events)
     downloadICS(icsContent, "vanderpump-volunteer-shifts.ics")
-    toast.success("All shifts exported!")
+    toast.success("All shifts downloaded! Open the file to add to your calendar.")
   }
 
   if (loading) {
@@ -244,9 +243,9 @@ export default function MySchedulePage() {
           </div>
           <div className="flex gap-2">
             {assignments.length > 0 && (
-              <Button variant="outline" onClick={handleExportAll}>
-                <Download className="mr-2 h-4 w-4" />
-                Export All
+              <Button variant="outline" onClick={handleAddAllToCalendar}>
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                Add All to Calendar
               </Button>
             )}
             <Button asChild>
@@ -355,10 +354,10 @@ export default function MySchedulePage() {
                         variant="outline"
                         size="sm"
                         className="flex-1 bg-transparent"
-                        onClick={() => handleExportShift(assignment)}
+                        onClick={() => handleAddToCalendar(assignment)}
                       >
-                        <Download className="mr-2 h-4 w-4" />
-                        Export
+                        <CalendarPlus className="mr-2 h-4 w-4" />
+                        Add to Calendar
                       </Button>
                       <Button
                         variant="outline"
