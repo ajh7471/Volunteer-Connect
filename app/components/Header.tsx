@@ -37,10 +37,14 @@ export default function Header() {
     console.log("[v0] Header: Starting sign out...")
     setSigningOut(true)
 
-    // Start sign out but don't await - redirect immediately for better UX
-    supabase.auth.signOut()
+    try {
+      // Wait for sign out to complete
+      await supabase.auth.signOut()
+      console.log("[v0] Header: Sign out completed, redirecting...")
+    } catch (error) {
+      console.error("[v0] Header: Sign out error:", error)
+    }
 
-    console.log("[v0] Header: Redirecting immediately...")
     // Use hard redirect for complete state clearing
     window.location.href = "/auth/login"
   }
