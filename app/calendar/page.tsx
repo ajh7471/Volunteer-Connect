@@ -315,18 +315,18 @@ export default function CalendarPage() {
                         </div>
 
                         {shift.assignments_count > 0 && (
-                          <div className="space-y-2">
+                          <div className="space-y-2 border-t pt-3">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="w-full justify-start gap-2 h-auto py-2"
+                              className="w-full justify-start gap-2 h-auto py-2 px-2"
                               onClick={() => loadShiftAttendees(shift.id)}
                             >
-                              <Users className="h-4 w-4" />
-                              <span className="text-xs">
+                              <Users className="h-4 w-4 text-primary" />
+                              <span className="text-xs font-medium">
                                 {attendees
-                                  ? `${attendees.length} volunteer${attendees.length !== 1 ? "s" : ""} signed up`
-                                  : `View ${shift.assignments_count} volunteer${shift.assignments_count !== 1 ? "s" : ""}`}
+                                  ? `${attendees.length} volunteer${attendees.length !== 1 ? "s" : ""} on your team`
+                                  : `View team (${shift.assignments_count} volunteer${shift.assignments_count !== 1 ? "s" : ""})`}
                               </span>
                             </Button>
 
@@ -337,14 +337,12 @@ export default function CalendarPage() {
                             )}
 
                             {attendees && attendees.length > 0 && (
-                              <div className="ml-2 space-y-1">
+                              <div className="space-y-1 bg-muted/30 rounded-md p-2">
+                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Team Members:</p>
                                 {attendees.map((attendee) => (
-                                  <div
-                                    key={attendee.id}
-                                    className="text-xs text-muted-foreground flex items-center gap-1"
-                                  >
-                                    <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
-                                    {attendee.name}
+                                  <div key={attendee.id} className="text-xs flex items-center gap-2 py-1">
+                                    <div className="h-2 w-2 rounded-full bg-primary"></div>
+                                    <span className="font-medium">{attendee.name}</span>
                                   </div>
                                 ))}
                               </div>

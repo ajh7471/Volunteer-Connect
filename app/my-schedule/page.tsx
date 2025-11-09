@@ -34,11 +34,20 @@ type WaitlistEntry = {
   end_time: string
 }
 
+type TeamMember = {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+}
+
 export default function MySchedulePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
+  const [shiftTeamMembers, setShiftTeamMembers] = useState<Record<string, TeamMember[]>>({})
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadAssignments()
@@ -209,6 +218,50 @@ export default function MySchedulePage() {
     toast.success("All shifts downloaded! Open the file to add to your calendar.")
   }
 
+  async function loadTeamMembers(shiftId: string) {
+    if (shiftTeamMembers[shiftId]) return // Already loaded
+
+    setLoadingTeamMembers((prev) => new Set(prev).add(shiftId))
+
+    const { data, error } = await supabase
+      .from("shift_assignments")
+      .select(
+        `
+        user_id,
+        profiles (
+          id,
+          name,
+          email,
+          phone
+        )
+      `,
+      )
+      .eq("shift_id", shiftId)
+      .neq("user_id", userId!) // Exclude current user
+
+    if (!error && data) {
+      const members = data
+        .filter((a: any) => a.profiles)
+        .map((a: any) => ({
+          id: a.profiles.id,
+          name: a.profiles.name || "Anonymous",
+          email: a.profiles.email,
+          phone: a.profiles.phone,
+        }))
+
+      setShiftTeamMembers((prev) => ({
+        ...prev,
+        [shiftId]: members,
+      }))
+    }
+
+    setLoadingTeamMembers((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(shiftId)
+      return newSet
+    })
+  }
+
   if (loading) {
     return (
       <RequireAuth>
@@ -313,6 +366,8 @@ export default function MySchedulePage() {
               const date = new Date(assignment.shift_date)
               const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
               const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
+              const teamMembers = shiftTeamMembers[assignment.shift_id]
+              const isLoadingTeam = loadingTeamMembers.has(assignment.shift_id)
 
               return (
                 <Card key={assignment.id}>
@@ -336,6 +391,47 @@ export default function MySchedulePage() {
                         {assignment.start_time} - {assignment.end_time}
                       </span>
                     </div>
+
+                    <div className="border-t pt-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start gap-2 h-auto py-2 px-2"
+                        onClick={() => loadTeamMembers(assignment.shift_id)}
+                      >
+                        <Users className="h-4 w-4" />
+                        <span className="text-xs font-medium">
+                          {teamMembers ? "Your Team Members" : "View Team Members"}
+                        </span>
+                      </Button>
+
+                      {isLoadingTeam && (
+                        <div className="flex items-center justify-center py-3">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+
+                      {teamMembers && (
+                        <div className="mt-2 space-y-2">
+                          {teamMembers.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-2">
+                              You're the only one signed up so far
+                            </p>
+                          ) : (
+                            teamMembers.map((member) => (
+                              <div key={member.id} className="bg-muted/50 rounded-md p-2 space-y-1">
+                                <p className="text-sm font-medium">{member.name}</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-muted-foreground break-all">{member.email}</p>
+                                  {member.phone && <p className="text-xs text-muted-foreground">{member.phone}</p>}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <Button
                       variant="outline"
                       size="sm"
