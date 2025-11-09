@@ -24,23 +24,28 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
+    console.log("[v0] Login: Starting authentication...")
+
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError) {
+      console.error("[v0] Login: Auth error:", authError)
       setError(authError.message)
       setLoading(false)
     } else if (data.user) {
+      console.log("[v0] Login: User authenticated:", data.user.id)
+
       // Check user role in profiles table to determine redirect destination
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
+      console.log("[v0] Login: User role:", profile?.role)
 
-      if (profile?.role === "admin") {
-        router.push("/admin")
-      } else {
-        router.push("/volunteer")
-      }
+      // Give the auth state change listener time to fire and update components
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
-      // Force a page refresh to update header navigation
-      router.refresh()
+      const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+      console.log("[v0] Login: Redirecting to:", destination)
+
+      window.location.href = destination
     }
   }
 

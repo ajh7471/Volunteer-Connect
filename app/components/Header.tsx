@@ -30,9 +30,14 @@ export default function Header() {
   const { userId, role, loading } = useSessionRole()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  console.log("[v0] Header render - userId:", userId, "role:", role, "loading:", loading)
+
   const signOut = async () => {
+    console.log("[v0] Header: Starting sign out...")
     await supabase.auth.signOut()
+    console.log("[v0] Header: Sign out complete, redirecting...")
     r.push("/auth/login")
+    r.refresh()
   }
 
   return (
