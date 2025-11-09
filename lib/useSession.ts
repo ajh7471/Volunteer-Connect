@@ -53,7 +53,14 @@ export function useSessionRole() {
       console.log("[v0] useSessionRole: Auth state changed:", event, "Session:", !!session)
       if (!mounted) return
 
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+      if (event === "SIGNED_OUT") {
+        setUserId(null)
+        setRole(null)
+        setLoading(false)
+        return
+      }
+
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         // Reload user data when auth state changes
         await load()
       }

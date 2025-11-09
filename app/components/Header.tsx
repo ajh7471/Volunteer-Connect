@@ -29,15 +29,20 @@ export default function Header() {
   const r = useRouter()
   const { userId, role, loading } = useSessionRole()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   console.log("[v0] Header render - userId:", userId, "role:", role, "loading:", loading)
 
   const signOut = async () => {
     console.log("[v0] Header: Starting sign out...")
-    await supabase.auth.signOut()
-    console.log("[v0] Header: Sign out complete, redirecting...")
-    r.push("/auth/login")
-    r.refresh()
+    setSigningOut(true)
+
+    // Start sign out but don't await - redirect immediately for better UX
+    supabase.auth.signOut()
+
+    console.log("[v0] Header: Redirecting immediately...")
+    // Use hard redirect for complete state clearing
+    window.location.href = "/auth/login"
   }
 
   return (
@@ -59,10 +64,10 @@ export default function Header() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden items-center gap-2 md:flex">
-            {loading ? (
-              <span className="text-sm text-muted-foreground">Loading...</span>
+            {loading || signingOut ? (
+              <span className="text-sm text-muted-foreground">{signingOut ? "Signing out..." : "Loading..."}</span>
             ) : userId ? (
-              <Button onClick={signOut} variant="default" size="sm">
+              <Button onClick={signOut} variant="default" size="sm" disabled={signingOut}>
                 Sign Out
               </Button>
             ) : (
@@ -95,8 +100,8 @@ export default function Header() {
             {role === "admin" && <NavLink href="/admin" label="Admin" onClick={() => setMobileMenuOpen(false)} />}
             <div className="mt-2 flex flex-col gap-2">
               {userId ? (
-                <Button onClick={signOut} variant="default" size="sm" className="w-full">
-                  Sign Out
+                <Button onClick={signOut} variant="default" size="sm" className="w-full" disabled={signingOut}>
+                  {signingOut ? "Signing out..." : "Sign Out"}
                 </Button>
               ) : (
                 <>
