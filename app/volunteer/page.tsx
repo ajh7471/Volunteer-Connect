@@ -180,54 +180,6 @@ export default function VolunteerDashboard() {
           </Card>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Impact</CardTitle>
-              <Award className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold">{stats.totalCompletedShifts}</span>
-                  <span className="text-sm text-muted-foreground">shifts</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold">{stats.totalHoursWorked}</span>
-                  <span className="text-sm text-muted-foreground">hours</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Next Shift</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {stats.nextShift ? (
-                <>
-                  <div className="text-2xl font-bold">
-                    {new Date(stats.nextShift.shift_date).toLocaleDateString("default", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {stats.nextShift.start_time} - {stats.nextShift.end_time}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="text-2xl font-bold">-</div>
-                  <p className="text-xs text-muted-foreground">No upcoming shifts</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -326,6 +278,34 @@ export default function VolunteerDashboard() {
                 })}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5" />
+              Total Impact
+            </CardTitle>
+            <CardDescription>Your complete volunteering journey and contributions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Shifts Completed</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-bold">{stats.totalCompletedShifts}</span>
+                  <span className="text-lg text-muted-foreground">shifts</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Hours Volunteered</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-bold">{stats.totalHoursWorked}</span>
+                  <span className="text-lg text-muted-foreground">hours</span>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
