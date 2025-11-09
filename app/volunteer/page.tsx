@@ -108,6 +108,39 @@ export default function VolunteerDashboard() {
           <p className="text-muted-foreground">Welcome back! Here's your volunteer overview</p>
         </div>
 
+        {/* Quick Actions */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Browse Calendar</CardTitle>
+              <CardDescription>Find and sign up for new volunteer shifts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link href="/calendar">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  View Calendar
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>My Schedule</CardTitle>
+              <CardDescription>Manage your upcoming volunteer shifts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full bg-transparent">
+                <Link href="/my-schedule">
+                  <Clock className="mr-2 h-4 w-4" />
+                  View Schedule
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Card>
@@ -258,39 +291,6 @@ export default function VolunteerDashboard() {
             )}
           </CardContent>
         </Card>
-
-        {/* Quick Actions */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Browse Calendar</CardTitle>
-              <CardDescription>Find and sign up for new volunteer shifts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full">
-                <Link href="/calendar">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  View Calendar
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>My Schedule</CardTitle>
-              <CardDescription>Manage your upcoming volunteer shifts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" className="w-full bg-transparent">
-                <Link href="/my-schedule">
-                  <Clock className="mr-2 h-4 w-4" />
-                  View Schedule
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </RequireAuth>
   )
