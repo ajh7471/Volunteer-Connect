@@ -170,8 +170,27 @@ export default function CalendarPage() {
     })
   }
 
-  // Get shifts for selected date
-  const selectedDateShifts = selectedDate ? shifts.filter((s) => s.shift_date === ymd(selectedDate)) : []
+  // Get shifts for selected date, excluding shifts that have already passed
+  const selectedDateShifts = selectedDate
+    ? shifts.filter((s) => {
+        if (s.shift_date !== ymd(selectedDate)) return false
+
+        // Check if shift has already ended
+        const now = new Date()
+        const shiftDate = new Date(s.shift_date)
+        const [hours, minutes] = s.end_time.split(":").map(Number)
+        const shiftEndTime = new Date(
+          shiftDate.getFullYear(),
+          shiftDate.getMonth(),
+          shiftDate.getDate(),
+          hours,
+          minutes,
+        )
+
+        // Only show shifts that haven't ended yet
+        return shiftEndTime > now
+      })
+    : []
 
   const monthName = currentMonth.toLocaleString("default", { month: "long", year: "numeric" })
 
@@ -267,7 +286,6 @@ export default function CalendarPage() {
                     const status = getCapacityStatus(shift.capacity, shift.assignments_count)
                     const isAssigned = userAssignments.has(shift.id)
                     const isFull = status === "full"
-                    const isPast = new Date(shift.shift_date) < new Date()
                     const isSigningUp = signingUpShifts.has(shift.id)
                     const attendees = shiftAttendees[shift.id]
                     const isLoadingAttendees = loadingAttendees.has(shift.id)
@@ -335,75 +353,69 @@ export default function CalendarPage() {
                         )}
 
                         {/* Action buttons */}
-                        {!isPast && (
-                          <div className="flex gap-2">
-                            {isAssigned ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full bg-transparent"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // Find assignment ID and cancel
-                                  supabase
-                                    .from("shift_assignments")
-                                    .select("id")
-                                    .eq("shift_id", shift.id)
-                                    .eq("user_id", userId!)
-                                    .single()
-                                    .then(({ data }) => {
-                                      if (data) handleCancel(data.id)
-                                    })
-                                }}
-                              >
-                                Remove from Shift
-                              </Button>
-                            ) : isFull ? (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                className="w-full"
-                                disabled={isSigningUp}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleJoinWaitlist(shift.id)
-                                }}
-                              >
-                                {isSigningUp ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Joining...
-                                  </>
-                                ) : (
-                                  "Join Waitlist"
-                                )}
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                className="w-full"
-                                disabled={isSigningUp}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSignUp(shift.id)
-                                }}
-                              >
-                                {isSigningUp ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Signing up...
-                                  </>
-                                ) : (
-                                  "Add to My Shifts"
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                        )}
-
-                        {isPast && (
-                          <p className="text-xs text-center text-muted-foreground italic">This shift has passed</p>
-                        )}
+                        <div className="flex gap-2">
+                          {isAssigned ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full bg-transparent"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // Find assignment ID and cancel
+                                supabase
+                                  .from("shift_assignments")
+                                  .select("id")
+                                  .eq("shift_id", shift.id)
+                                  .eq("user_id", userId!)
+                                  .single()
+                                  .then(({ data }) => {
+                                    if (data) handleCancel(data.id)
+                                  })
+                              }}
+                            >
+                              Remove from Shift
+                            </Button>
+                          ) : isFull ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="w-full"
+                              disabled={isSigningUp}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleJoinWaitlist(shift.id)
+                              }}
+                            >
+                              {isSigningUp ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Joining...
+                                </>
+                              ) : (
+                                "Join Waitlist"
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              disabled={isSigningUp}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSignUp(shift.id)
+                              }}
+                            >
+                              {isSigningUp ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Signing up...
+                                </>
+                              ) : (
+                                "Add to My Shifts"
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     )
                   })}

@@ -13,26 +13,55 @@ type DayCellProps = {
 
 export function DayCell({ date, currentMonth, shifts, onDayClick }: DayCellProps) {
   const today = new Date()
-  const isToday = isSameDay(date, today)
+  today.setHours(0, 0, 0, 0) // Reset time to midnight for accurate date comparison
+
+  const cellDate = new Date(date)
+  cellDate.setHours(0, 0, 0, 0)
+
+  const isToday = isSameDay(date, new Date())
   const isCurrentMonth = isSameMonth(date, currentMonth)
+  const isPastDay = cellDate < today // Check if this day is in the past
 
   // Get shifts for this date
   const dateStr = date.toISOString().split("T")[0]
   const dayShifts = shifts.filter((s) => s.shift_date === dateStr)
 
-  const amShift = dayShifts.find((s) => s.slot === "AM")
-  const midShift = dayShifts.find((s) => s.slot === "MID")
-  const pmShift = dayShifts.find((s) => s.slot === "PM")
+  const now = new Date()
+  const availableShifts = dayShifts.filter((shift) => {
+    if (isPastDay) return false // Past days have no available shifts
+
+    if (isToday) {
+      // For today, check if shift end time has passed
+      const [hours, minutes] = shift.end_time.split(":").map(Number)
+      const shiftEndTime = new Date()
+      shiftEndTime.setHours(hours, minutes, 0, 0)
+      return shiftEndTime > now
+    }
+
+    return true // Future days show all shifts
+  })
+
+  const amShift = availableShifts.find((s) => s.slot === "AM")
+  const midShift = availableShifts.find((s) => s.slot === "MID")
+  const pmShift = availableShifts.find((s) => s.slot === "PM")
+
+  const handleClick = () => {
+    if (!isPastDay) {
+      onDayClick(date)
+    }
+  }
 
   return (
     <div
       className={`min-h-20 border-b border-r p-1 sm:min-h-24 sm:p-2 ${
         !isCurrentMonth ? "bg-muted/30" : "bg-background"
-      } ${isToday ? "bg-blue-50 dark:bg-blue-950" : ""} hover:bg-accent transition-colors cursor-pointer`}
-      onClick={() => onDayClick(date)}
+      } ${isToday ? "bg-blue-50 dark:bg-blue-950" : ""} ${
+        isPastDay ? "bg-muted/50 cursor-not-allowed opacity-60" : "hover:bg-accent cursor-pointer"
+      } transition-colors`}
+      onClick={handleClick}
     >
       <div
-        className={`text-sm font-medium ${!isCurrentMonth ? "text-muted-foreground" : ""} ${isToday ? "text-blue-600 dark:text-blue-400 font-bold" : ""}`}
+        className={`text-sm font-medium ${!isCurrentMonth || isPastDay ? "text-muted-foreground" : ""} ${isToday ? "text-blue-600 dark:text-blue-400 font-bold" : ""}`}
       >
         {date.getDate()}
       </div>
