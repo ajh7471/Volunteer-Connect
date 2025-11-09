@@ -331,23 +331,33 @@ export default function CalendarPage() {
 
                             {hasLoadedAttendees && !isLoadingAttendees && (
                               <div className="space-y-1 bg-muted/30 rounded-md p-2">
-                                {attendees.length > 0 ? (
-                                  <>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Team Members:</p>
-                                    {attendees.map((attendee) => (
-                                      <div key={attendee.id} className="text-xs flex items-center gap-2 py-1">
-                                        <div className="h-2 w-2 rounded-full bg-primary"></div>
-                                        <span className="font-medium">{attendee.name}</span>
-                                      </div>
-                                    ))}
-                                  </>
-                                ) : (
+                                {attendees.length === 0 ? (
                                   <div className="text-center py-2">
                                     <Users className="h-5 w-5 text-muted-foreground mx-auto mb-1" />
                                     <p className="text-xs text-muted-foreground">
                                       No volunteers signed up yet. Be the first!
                                     </p>
                                   </div>
+                                ) : attendees.length === 1 && attendees[0].id === userId ? (
+                                  <div className="text-center py-3">
+                                    <Users className="h-6 w-6 text-primary mx-auto mb-2" />
+                                    <p className="text-xs font-medium mb-1">You're currently the only volunteer!</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Invite a friend to join you for this shift
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Team Members:</p>
+                                    {attendees.map((attendee) => (
+                                      <div key={attendee.id} className="text-xs flex items-center gap-2 py-1">
+                                        <div className="h-2 w-2 rounded-full bg-primary"></div>
+                                        <span className="font-medium">
+                                          {attendee.id === userId ? `${attendee.name} (You)` : attendee.name}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </>
                                 )}
                               </div>
                             )}
