@@ -111,9 +111,9 @@ export default function SignupPage() {
           console.error("Profile update error:", profileError)
         }
 
-        // STEP 4: Show success message and redirect to calendar
+        // STEP 4: Show success message and redirect to volunteer dashboard
         toast.success("Account created! Please check your email to verify your account.")
-        router.push("/calendar")
+        router.push("/volunteer")
       }
     } catch (err: any) {
       // Handle any errors during the signup process
