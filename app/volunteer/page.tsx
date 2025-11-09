@@ -6,7 +6,7 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, TrendingUp, Loader2, ArrowRight, CheckCircle2 } from "lucide-react"
+import { Calendar, Clock, TrendingUp, Loader2, ArrowRight, Award } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd } from "@/lib/date"
 
@@ -25,8 +25,8 @@ export default function VolunteerDashboard() {
     totalUpcoming: 0,
     thisMonth: 0,
     nextShift: null as UpcomingShift | null,
-    completedShiftsThisMonth: 0,
-    totalHoursThisMonth: 0,
+    totalCompletedShifts: 0,
+    totalHoursWorked: 0,
   })
 
   useEffect(() => {
@@ -85,18 +85,15 @@ export default function VolunteerDashboard() {
 
     if (completedAssignments) {
       completedAssignments.forEach((assignment: any) => {
-        const shiftDate = assignment.shifts?.shift_date
-        if (shiftDate && shiftDate >= startOfMonth && shiftDate <= endOfMonth) {
-          completedCount++
+        completedCount++
 
-          const start = assignment.shifts.start_time
-          const end = assignment.shifts.end_time
-          if (start && end) {
-            const [startHour, startMin] = start.split(":").map(Number)
-            const [endHour, endMin] = end.split(":").map(Number)
-            const hours = endHour - startHour + (endMin - startMin) / 60
-            totalHours += hours
-          }
+        const start = assignment.shifts?.start_time
+        const end = assignment.shifts?.end_time
+        if (start && end) {
+          const [startHour, startMin] = start.split(":").map(Number)
+          const [endHour, endMin] = end.split(":").map(Number)
+          const hours = endHour - startHour + (endMin - startMin) / 60
+          totalHours += hours
         }
       })
     }
@@ -121,8 +118,8 @@ export default function VolunteerDashboard() {
         totalUpcoming: upcoming.length,
         thisMonth: thisMonthCount,
         nextShift: upcoming[0] || null,
-        completedShiftsThisMonth: completedCount,
-        totalHoursThisMonth: Math.round(totalHours * 10) / 10,
+        totalCompletedShifts: completedCount,
+        totalHoursWorked: Math.round(totalHours * 10) / 10,
       })
     }
 
@@ -204,12 +201,20 @@ export default function VolunteerDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed This Month</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Impact</CardTitle>
+              <Award className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.completedShiftsThisMonth}</div>
-              <p className="text-xs text-muted-foreground">{stats.totalHoursThisMonth} hours worked</p>
+              <div className="space-y-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{stats.totalCompletedShifts}</span>
+                  <span className="text-sm text-muted-foreground">shifts</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{stats.totalHoursWorked}</span>
+                  <span className="text-sm text-muted-foreground">hours</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
