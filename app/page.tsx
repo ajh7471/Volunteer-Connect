@@ -24,13 +24,9 @@ export default function HomePage() {
     setLoading(true)
     setError(null)
 
-    console.log("[v0] Login: Starting authentication...")
-
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError) {
-      console.error("[v0] Login: Auth error:", authError)
-
       if (authError.message.includes("Invalid login credentials") || authError.message.includes("invalid")) {
         setError("The password you entered is incorrect. Please check your credentials and try again.")
       } else if (authError.message.includes("Email not confirmed")) {
@@ -40,18 +36,11 @@ export default function HomePage() {
       }
       setLoading(false)
     } else if (data.user) {
-      console.log("[v0] Login: User authenticated:", data.user.id)
-
-      // Check user role in profiles table to determine redirect destination
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
-      console.log("[v0] Login: User role:", profile?.role)
 
-      // Give the auth state change listener time to fire and update components
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
-      console.log("[v0] Login: Redirecting to:", destination)
-
       window.location.href = destination
     }
   }
