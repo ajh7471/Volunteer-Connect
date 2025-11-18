@@ -36,7 +36,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     loadMonthData()
-  }, [currentMonth])
+  }, [currentMonth, userId]) // Added userId dependency to reload data when user is authenticated
 
   async function loadUser() {
     const { data } = await supabase.auth.getUser()
