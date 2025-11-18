@@ -49,6 +49,7 @@ export function useSessionRole() {
       if (!mounted) return
 
       if (event === "SIGNED_OUT") {
+        // Immediately clear state on sign out
         setUserId(null)
         setRole(null)
         setLoading(false)
@@ -57,6 +58,11 @@ export function useSessionRole() {
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         // Reload user data when auth state changes
+        await load(false)
+      }
+
+      if (event === "USER_UPDATED") {
+        // Re-validate session on user updates (password change, etc.)
         await load(false)
       }
     })

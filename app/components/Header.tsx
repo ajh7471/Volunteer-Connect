@@ -7,6 +7,7 @@ import { useSessionRole } from "@/lib/useSession"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from 'lucide-react'
 import { useState } from "react"
+import { useToast } from "@/hooks/use-toast"
 
 function NavLink({ href, label, onClick }: { href: string; label: string; onClick?: () => void }) {
   const pathname = usePathname()
@@ -30,19 +31,38 @@ export default function Header() {
   const { userId, role, loading } = useSessionRole()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const { toast } = useToast()
 
   const signOut = async () => {
     setSigningOut(true)
 
     try {
-      // Wait for sign out to complete
-      await supabase.auth.signOut()
-    } catch (error) {
-      console.error("Sign out error:", error)
-    }
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      
+      if (error) {
+        throw error
+      }
 
-    // Use hard redirect for complete state clearing
-    window.location.href = "/"
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('volunteer-connect-cache')
+          sessionStorage.clear()
+        } catch (storageError) {
+          console.error('Storage cleanup error:', storageError)
+        }
+      }
+
+      window.location.href = "/"
+    } catch (error: any) {
+      console.error("Sign out error:", error)
+      setSigningOut(false)
+      
+      toast({
+        title: "Sign out failed",
+        description: error?.message || "Unable to sign out. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

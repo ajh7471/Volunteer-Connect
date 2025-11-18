@@ -34,7 +34,6 @@ export async function middleware(request: NextRequest) {
   } catch (error: any) {
     // If we get a session error (403), treat it as no user
     // This happens during sign-out when cookies are in transition
-    console.log("[v0] Middleware: Auth error (treating as no user):", error?.message)
     user = null
   }
 
@@ -58,6 +57,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/auth/login", request.url))
     }
   }
+
+  response.headers.set('X-Frame-Options', 'DENY')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
 
   return response
 }
