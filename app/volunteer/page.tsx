@@ -6,7 +6,7 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, Loader2, ArrowRight, Award } from "lucide-react"
+import { Calendar, Clock, Loader2, ArrowRight, Award } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import { ymd, parseDate } from "@/lib/date"
 
@@ -55,6 +55,7 @@ export default function VolunteerDashboard() {
         `
         id,
         shift_id,
+        status,
         shifts (
           shift_date,
           start_time,
@@ -65,62 +66,48 @@ export default function VolunteerDashboard() {
       )
       .eq("user_id", userId)
 
-    const { data: completedAssignments } = await supabase
-      .from("shift_assignments")
-      .select(
-        `
-        id,
-        status,
-        shifts (
-          shift_date,
-          start_time,
-          end_time
-        )
-      `,
-      )
-      .eq("user_id", userId)
-      .eq("status", "completed")
-
     let completedCount = 0
     let totalHours = 0
-
-    if (completedAssignments) {
-      completedAssignments.forEach((assignment: any) => {
-        completedCount++
-
-        const start = assignment.shifts?.start_time
-        const end = assignment.shifts?.end_time
-        if (start && end) {
-          const [startHour, startMin] = start.split(":").map(Number)
-          const [endHour, endMin] = end.split(":").map(Number)
-          const hours = endHour - startHour + (endMin - startMin) / 60
-          totalHours += hours
-        }
-      })
-    }
+    const upcoming: UpcomingShift[] = []
 
     if (assignments) {
-      const upcoming = assignments
-        .filter((a: any) => a.shifts?.shift_date >= today)
-        .map((a: any) => ({
-          id: a.id,
-          shift_date: a.shifts.shift_date,
-          start_time: a.shifts.start_time,
-          end_time: a.shifts.end_time,
-          slot: a.shifts.slot,
-        }))
-        .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
+      assignments.forEach((assignment: any) => {
+        // Process completed stats
+        if (assignment.status === "completed") {
+          completedCount++
+          const start = assignment.shifts?.start_time
+          const end = assignment.shifts?.end_time
+          if (start && end) {
+            const [startHour, startMin] = start.split(":").map(Number)
+            const [endHour, endMin] = end.split(":").map(Number)
+            const hours = endHour - startHour + (endMin - startMin) / 60
+            totalHours += hours
+          }
+        }
+
+        // Process upcoming shifts
+        if (assignment.shifts?.shift_date >= today) {
+          upcoming.push({
+            id: assignment.id,
+            shift_date: assignment.shifts.shift_date,
+            start_time: assignment.shifts.start_time,
+            end_time: assignment.shifts.end_time,
+            slot: assignment.shifts.slot,
+          })
+        }
+      })
+
+      // Sort upcoming shifts by date
+      upcoming.sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
       setUpcomingShifts(upcoming.slice(0, 3))
 
       const thisMonth = upcoming.filter((s) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth)
       setThisMonthShifts(thisMonth)
 
-      const thisMonthCount = thisMonth.length
-
       setStats({
         totalUpcoming: upcoming.length,
-        thisMonth: thisMonthCount,
+        thisMonth: thisMonth.length,
         nextShift: upcoming[0] || null,
         totalCompletedShifts: completedCount,
         totalHoursWorked: Math.round(totalHours * 10) / 10,

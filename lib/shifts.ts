@@ -37,28 +37,38 @@ export async function getMonthShifts(year: number, month: number): Promise<Shift
     return []
   }
 
-  // Get assignment counts for each shift using a proper select query
-  const shiftsWithCounts = await Promise.all(
-    (shifts || []).map(async (shift) => {
-      const { data: assignments, error: assignmentError } = await supabase
-        .from("shift_assignments")
-        .select("id")
-        .eq("shift_id", shift.id)
+  if (!shifts || shifts.length === 0) {
+    return []
+  }
 
-      if (assignmentError) {
-        console.error("[v0] Error fetching assignments for shift:", shift.id, assignmentError)
-      }
+  const shiftIds = shifts.map((s) => s.id)
+  
+  const { data: allAssignments, error: assignmentError } = await supabase
+    .from("shift_assignments")
+    .select("shift_id")
+    .in("shift_id", shiftIds)
 
-      const count = assignments?.length || 0
+  if (assignmentError) {
+    console.error("[v0] Error fetching assignments:", assignmentError)
+  }
 
-      console.log("[v0] Shift", shift.shift_date, shift.start_time, "- Count:", count, "Capacity:", shift.capacity)
+  // Create a map of shift_id -> count
+  const assignmentCounts = new Map<string, number>()
+  if (allAssignments) {
+    allAssignments.forEach((a) => {
+      const current = assignmentCounts.get(a.shift_id) || 0
+      assignmentCounts.set(a.shift_id, current + 1)
+    })
+  }
 
-      return {
-        ...shift,
-        assignments_count: count,
-      }
-    }),
-  )
+  const shiftsWithCounts = shifts.map((shift) => {
+    const count = assignmentCounts.get(shift.id) || 0
+    // console.log("[v0] Shift", shift.shift_date, shift.start_time, "- Count:", count, "Capacity:", shift.capacity)
+    return {
+      ...shift,
+      assignments_count: count,
+    }
+  })
 
   return shiftsWithCounts
 }
