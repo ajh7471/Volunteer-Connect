@@ -267,7 +267,7 @@ export default function CalendarPage() {
             </div>
             <div className="flex items-center gap-2">
               <div className="h-6 w-12 rounded bg-gray-300"></div>
-              <span className="text-sm">No Shift</span>
+              <span className="text-sm">Not Available</span>
             </div>
           </CardContent>
         </Card>

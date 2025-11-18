@@ -34,7 +34,7 @@ export function ShiftIndicator({ slot, startTime, endTime, capacity, assignments
     available: "Available",
     "nearly-full": "Nearly Full",
     full: "Full",
-    none: "No Shift",
+    none: "Not Available",
   }
 
   return (
