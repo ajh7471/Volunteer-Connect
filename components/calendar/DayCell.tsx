@@ -67,13 +67,31 @@ export function DayCell({ date, currentMonth, shifts, onDayClick }: DayCellProps
       </div>
       <div className="mt-1 space-y-1">
         {amShift && (
-          <ShiftIndicator slot="AM" capacity={amShift.capacity} assignmentsCount={amShift.assignments_count} />
+          <ShiftIndicator
+            slot="AM"
+            startTime={amShift.start_time}
+            endTime={amShift.end_time}
+            capacity={amShift.capacity}
+            assignmentsCount={amShift.assignments_count}
+          />
         )}
         {midShift && (
-          <ShiftIndicator slot="MID" capacity={midShift.capacity} assignmentsCount={midShift.assignments_count} />
+          <ShiftIndicator
+            slot="MID"
+            startTime={midShift.start_time}
+            endTime={midShift.end_time}
+            capacity={midShift.capacity}
+            assignmentsCount={midShift.assignments_count}
+          />
         )}
         {pmShift && (
-          <ShiftIndicator slot="PM" capacity={pmShift.capacity} assignmentsCount={pmShift.assignments_count} />
+          <ShiftIndicator
+            slot="PM"
+            startTime={pmShift.start_time}
+            endTime={pmShift.end_time}
+            capacity={pmShift.capacity}
+            assignmentsCount={pmShift.assignments_count}
+          />
         )}
       </div>
     </div>
