@@ -46,38 +46,12 @@ export default function CalendarPage() {
   async function loadMonthData() {
     setLoading(true)
 
-    // Parallelize fetching shifts and user assignments
-    const [monthShifts, userAssignmentsData] = await Promise.all([
-      getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth()),
-      userId
-        ? supabase
-            .from("shift_assignments")
-            .select("shift_id")
-            .eq("user_id", userId)
-            .gte(
-              "created_at",
-              ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)), // Optimization: filter by date range if possible, but created_at isn't shift_date.
-              // Better to just fetch all for user or filter by shift date if we could join.
-              // For now, just fetching all user assignments is okay if not too many, but let's try to be smarter.
-              // Actually, the previous code fetched ALL assignments for the user without date filter?
-              // No, it had logic:
-              // const startDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1))
-              // const endDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0))
-              // But it didn't use them in the query!
-              // Let's fix that if possible. shift_assignments doesn't have shift_date.
-              // We'd need to join shifts.
-            )
-        : Promise.resolve({ data: [] }),
-    ])
-
+    // Fetch shifts for the month
+    const monthShifts = await getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth())
     setShifts(monthShifts)
 
-    // Load user's assignments for this month
-    if (userId && userAssignmentsData.data) {
-      // Since we can't easily filter by shift date on shift_assignments without a join and complex filter,
-      // and the previous code didn't actually use the dates it calculated,
-      // we'll stick to the previous behavior but parallelized.
-      // Ideally we should filter by shift_id IN (monthShifts.map(s => s.id))
+    // Load user's assignments for these shifts
+    if (userId) {
       const shiftIds = monthShifts.map((s) => s.id)
       if (shiftIds.length > 0) {
         const { data } = await supabase
@@ -88,6 +62,8 @@ export default function CalendarPage() {
 
         if (data) {
           setUserAssignments(new Set(data.map((a) => a.shift_id)))
+        } else {
+          setUserAssignments(new Set())
         }
       } else {
         setUserAssignments(new Set())
@@ -320,10 +296,6 @@ export default function CalendarPage() {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <div className="h-6 w-12 rounded bg-blue-600"></div>
-              <span className="text-sm">Registered</span>
-            </div>
-            <div className="flex items-center gap-2">
               <div className="h-6 w-12 rounded bg-green-500"></div>
               <span className="text-sm">Available</span>
             </div>
@@ -338,6 +310,10 @@ export default function CalendarPage() {
             <div className="flex items-center gap-2">
               <div className="h-6 w-12 rounded bg-gray-300"></div>
               <span className="text-sm">Not Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-12 rounded bg-blue-600"></div>
+              <span className="text-sm">Registered</span>
             </div>
           </CardContent>
         </Card>
