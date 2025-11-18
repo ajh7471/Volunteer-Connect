@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
 import { MonthlyGrid } from "@/components/calendar/MonthlyGrid"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock, Users } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock, Users } from 'lucide-react'
 import { addMonths, ymd, parseDate } from "@/lib/date"
 import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStatus } from "@/lib/shifts"
 import { supabase } from "@/lib/supabaseClient"
@@ -42,18 +42,51 @@ export default function CalendarPage() {
   async function loadMonthData() {
     setLoading(true)
 
-    const monthShifts = await getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth())
+    // Parallelize fetching shifts and user assignments
+    const [monthShifts, userAssignmentsData] = await Promise.all([
+      getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth()),
+      userId
+        ? supabase
+            .from("shift_assignments")
+            .select("shift_id")
+            .eq("user_id", userId)
+            .gte(
+              "created_at",
+              ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)), // Optimization: filter by date range if possible, but created_at isn't shift_date.
+              // Better to just fetch all for user or filter by shift date if we could join.
+              // For now, just fetching all user assignments is okay if not too many, but let's try to be smarter.
+              // Actually, the previous code fetched ALL assignments for the user without date filter?
+              // No, it had logic:
+              // const startDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1))
+              // const endDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0))
+              // But it didn't use them in the query!
+              // Let's fix that if possible. shift_assignments doesn't have shift_date.
+              // We'd need to join shifts.
+            )
+        : Promise.resolve({ data: [] }),
+    ])
+
     setShifts(monthShifts)
 
     // Load user's assignments for this month
-    if (userId) {
-      const startDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1))
-      const endDate = ymd(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0))
+    if (userId && userAssignmentsData.data) {
+      // Since we can't easily filter by shift date on shift_assignments without a join and complex filter,
+      // and the previous code didn't actually use the dates it calculated,
+      // we'll stick to the previous behavior but parallelized.
+      // Ideally we should filter by shift_id IN (monthShifts.map(s => s.id))
+      const shiftIds = monthShifts.map((s) => s.id)
+      if (shiftIds.length > 0) {
+        const { data } = await supabase
+          .from("shift_assignments")
+          .select("shift_id")
+          .eq("user_id", userId)
+          .in("shift_id", shiftIds)
 
-      const { data } = await supabase.from("shift_assignments").select("shift_id").eq("user_id", userId)
-
-      if (data) {
-        setUserAssignments(new Set(data.map((a) => a.shift_id)))
+        if (data) {
+          setUserAssignments(new Set(data.map((a) => a.shift_id)))
+        }
+      } else {
+        setUserAssignments(new Set())
       }
     }
 

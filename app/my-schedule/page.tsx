@@ -5,7 +5,7 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Loader2, Users, CalendarPlus } from "lucide-react"
+import { Calendar, Clock, Loader2, Users, CalendarPlus } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import { ymd, parseDate } from "@/lib/date"
 import { toast } from "@/lib/toast"
@@ -64,73 +64,69 @@ export default function MySchedulePage() {
 
     setUserId(uid)
 
-    // Get upcoming assignments
+    // Get upcoming assignments and waitlist in parallel
     const today = ymd(new Date())
-    const { data, error } = await supabase
-      .from("shift_assignments")
-      .select(
-        `
-        id,
-        shift_id,
-        shifts (
-          shift_date,
-          slot,
-          start_time,
-          end_time
+    
+    const [assignmentsResult, waitlistResult] = await Promise.all([
+      supabase
+        .from("shift_assignments")
+        .select(
+          `
+          id,
+          shift_id,
+          shifts (
+            shift_date,
+            slot,
+            start_time,
+            end_time
+          )
+        `,
         )
-      `,
-      )
-      .eq("user_id", uid)
+        .eq("user_id", uid),
+      supabase
+        .from("shift_waitlist")
+        .select(
+          `
+          id,
+          shift_id,
+          position,
+          status,
+          joined_at,
+          shifts (
+            shift_date,
+            slot,
+            start_time,
+            end_time
+          )
+        `,
+        )
+        .eq("user_id", uid)
+        .in("status", ["waiting", "notified"])
+    ])
 
-    if (error) {
-      console.error("[v0] Error loading assignments:", error)
+    // Process Assignments
+    if (assignmentsResult.error) {
+      console.error("[v0] Error loading assignments:", assignmentsResult.error)
       toast.error("Failed to load your schedule")
-      setLoading(false)
-      return
+    } else {
+      const formatted = (assignmentsResult.data || [])
+        .filter((a: any) => a.shifts?.shift_date >= today)
+        .map((a: any) => ({
+          id: a.id,
+          shift_id: a.shift_id,
+          shift_date: a.shifts.shift_date,
+          slot: a.shifts.slot,
+          start_time: a.shifts.start_time,
+          end_time: a.shifts.end_time,
+        }))
+        .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
+
+      setAssignments(formatted)
     }
 
-    const formatted = (data || [])
-      .filter((a: any) => a.shifts?.shift_date >= today)
-      .map((a: any) => ({
-        id: a.id,
-        shift_id: a.shift_id,
-        shift_date: a.shifts.shift_date,
-        slot: a.shifts.slot,
-        start_time: a.shifts.start_time,
-        end_time: a.shifts.end_time,
-      }))
-      .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
-
-    setAssignments(formatted)
-
-    await loadWaitlist(uid, today)
-
-    setLoading(false)
-  }
-
-  async function loadWaitlist(uid: string, today: string) {
-    const { data: waitlistData } = await supabase
-      .from("shift_waitlist")
-      .select(
-        `
-        id,
-        shift_id,
-        position,
-        status,
-        joined_at,
-        shifts (
-          shift_date,
-          slot,
-          start_time,
-          end_time
-        )
-      `,
-      )
-      .eq("user_id", uid)
-      .in("status", ["waiting", "notified"])
-
-    if (waitlistData) {
-      const formattedWaitlist = waitlistData
+    // Process Waitlist
+    if (waitlistResult.data) {
+      const formattedWaitlist = waitlistResult.data
         .filter((w: any) => w.shifts?.shift_date >= today)
         .map((w: any) => ({
           id: w.id,
@@ -147,6 +143,8 @@ export default function MySchedulePage() {
 
       setWaitlistEntries(formattedWaitlist)
     }
+
+    setLoading(false)
   }
 
   async function handleCancel(assignmentId: string) {

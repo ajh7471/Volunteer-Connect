@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Trash2, UserPlus, AlertCircle, Loader2 } from "lucide-react"
+import { Calendar, Trash2, UserPlus, AlertCircle, Loader2 } from 'lucide-react'
 import { ymd } from "@/lib/date"
 import Link from "next/link"
 import { toast } from "@/lib/toast"
@@ -69,36 +69,61 @@ export default function AdminShiftsPage() {
       )
       setShifts(sorted)
 
-      // Load assignments for these shifts
+      // Parallelize fetching assignments and volunteers
       const shiftIds = sorted.map((s) => s.id)
-      if (shiftIds.length > 0) {
-        const { data: assignData } = await supabase
-          .from("shift_assignments")
-          .select("*, profiles(name, phone)")
-          .in("shift_id", shiftIds)
+      
+      const [assignResult, volResult] = await Promise.all([
+        shiftIds.length > 0 
+          ? supabase
+              .from("shift_assignments")
+              .select("*, profiles(name, phone)")
+              .in("shift_id", shiftIds)
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from("profiles")
+          .select("id, name, phone, active")
+          .or("active.is.null,active.eq.true")
+          .order("name", { ascending: true })
+      ])
 
-        if (assignData) {
-          const grouped: Record<string, Assignment[]> = {}
-          assignData.forEach((a) => {
-            if (!grouped[a.shift_id]) grouped[a.shift_id] = []
-            grouped[a.shift_id].push(a as Assignment)
-          })
-          setAssignments(grouped)
-        }
+      // Process assignments
+      if (assignResult.data) {
+        const grouped: Record<string, Assignment[]> = {}
+        assignResult.data.forEach((a) => {
+          if (!grouped[a.shift_id]) grouped[a.shift_id] = []
+          grouped[a.shift_id].push(a as Assignment)
+        })
+        setAssignments(grouped)
       } else {
         setAssignments({})
       }
-    }
 
-    // Load active volunteers for assignment dropdown
-    const { data: volData } = await supabase
-      .from("profiles")
-      .select("id, name, phone, active")
-      .or("active.is.null,active.eq.true")
-      .order("name", { ascending: true })
-
-    if (volData) {
-      setVolunteers(volData as Volunteer[])
+      // Process volunteers
+      if (volResult.data) {
+        setVolunteers(volResult.data as Volunteer[])
+      }
+    } else {
+      // Even if no shifts, we might want to load volunteers? 
+      // Probably not needed if no shifts to assign to.
+      setShifts([])
+      setAssignments({})
+      
+      // Still load volunteers in case they want to seed and then assign immediately?
+      // The original code loaded volunteers regardless of shifts existence (it was outside the if(shiftsData) block? No, it was after.)
+      // Wait, original code:
+      // if (shiftsData) { ... }
+      // const { data: volData } = await supabase...
+      // So volunteers were loaded even if no shifts.
+      
+      const { data: volData } = await supabase
+        .from("profiles")
+        .select("id, name, phone, active")
+        .or("active.is.null,active.eq.true")
+        .order("name", { ascending: true })
+        
+      if (volData) {
+        setVolunteers(volData as Volunteer[])
+      }
     }
 
     setLoading(false)

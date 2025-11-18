@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Users, TrendingUp, Download, FileText, BarChart } from "lucide-react"
+import { Calendar, Users, TrendingUp, Download, FileText, BarChart } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import {
   getDashboardStats,
@@ -63,18 +63,31 @@ export default function ReportsPage() {
       const startDate = thirtyDaysAgo.toISOString().split("T")[0]
       const endDate = today.toISOString().split("T")[0]
 
-      // Load all data in parallel
-      const [statsRes, shiftStatsRes, slotsRes, activityRes] = await Promise.all([
+      // Load all data in parallel with error handling
+      const results = await Promise.allSettled([
         getDashboardStats(),
         getShiftStatistics(startDate, endDate),
         getPopularTimeSlots(),
         getRecentActivity(10),
       ])
 
-      if (statsRes.success) setDashboardStats(statsRes.data)
-      if (shiftStatsRes.success) setShiftStats(shiftStatsRes.data || null)
-      if (slotsRes.success) setPopularSlots(slotsRes.data || [])
-      if (activityRes.success) setRecentActivity(activityRes.data || [])
+      const [statsRes, shiftStatsRes, slotsRes, activityRes] = results
+
+      if (statsRes.status === "fulfilled" && statsRes.value.success) {
+        setDashboardStats(statsRes.value.data)
+      }
+      
+      if (shiftStatsRes.status === "fulfilled" && shiftStatsRes.value.success) {
+        setShiftStats(shiftStatsRes.value.data || null)
+      }
+
+      if (slotsRes.status === "fulfilled" && slotsRes.value.success) {
+        setPopularSlots(slotsRes.value.data || [])
+      }
+
+      if (activityRes.status === "fulfilled" && activityRes.value.success) {
+        setRecentActivity(activityRes.value.data || [])
+      }
     } catch (error) {
       console.error("[v0] Error loading report data:", error)
     } finally {

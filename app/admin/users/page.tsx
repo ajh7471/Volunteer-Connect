@@ -32,8 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/lib/toast"
-import { UserPlus, Shield, Ban, Trash2, Calendar } from "lucide-react"
-import { createUserAccount, deleteUserAccount, updateUserRole, assignShiftToUser } from "../actions"
+import { UserPlus, Shield, Ban, Trash2, Calendar } from 'lucide-react'
+import { createUserAccount, deleteUserAccount, updateUserRole, assignShiftToUser, getAdminUsers } from "../actions"
 
 type User = {
   id: string
@@ -79,21 +79,12 @@ export default function AdminUsersPage() {
   async function loadUsers() {
     setLoading(true)
 
-    // Get all profiles with emails from auth.users
-    const { data: profiles } = await supabase.from("profiles").select("*").order("created_at", { ascending: false })
+    const result = await getAdminUsers()
 
-    if (profiles) {
-      // Get emails from auth metadata if available
-      const enrichedUsers = await Promise.all(
-        profiles.map(async (profile) => {
-          const { data } = await supabase.auth.admin.getUserById(profile.id)
-          return {
-            ...profile,
-            email: data.user?.email || "No email",
-          }
-        }),
-      )
-      setUsers(enrichedUsers as User[])
+    if (result.success && result.users) {
+      setUsers(result.users as User[])
+    } else {
+      toast.error(result.error || "Failed to load users")
     }
 
     setLoading(false)
