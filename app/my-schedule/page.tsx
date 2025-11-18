@@ -12,7 +12,7 @@ import { toast } from "@/lib/toast"
 import Link from "next/link"
 import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
 import { leaveWaitlist, acceptWaitlistSpot } from "@/app/admin/shift-management-actions"
-import { formatTime12Hour } from "@/lib/utils"
+import { formatTime12Hour } from "@/lib/date"
 
 type Assignment = {
   id: string

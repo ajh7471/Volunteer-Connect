@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, Loader2, ArrowRight, Award } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
-import { ymd, parseDate } from "@/lib/date"
-import { formatTime12Hour } from "@/lib/utils"
+import { ymd, parseDate, formatTime12Hour } from "@/lib/date"
 
 type UpcomingShift = {
   id: string

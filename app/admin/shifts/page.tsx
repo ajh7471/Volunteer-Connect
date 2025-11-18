@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Trash2, UserPlus, AlertCircle, Loader2 } from 'lucide-react'
-import { ymd } from "@/lib/date"
+import { ymd, formatTime12Hour } from "@/lib/date"
 import Link from "next/link"
 import { toast } from "@/lib/toast"
 
@@ -299,7 +299,7 @@ export default function AdminShiftsPage() {
                         {shift.slot === "PM" && "Afternoon Shift"}
                       </CardTitle>
                       <CardDescription>
-                        {shift.start_time} - {shift.end_time}
+                        {formatTime12Hour(shift.start_time)} - {formatTime12Hour(shift.end_time)}
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">

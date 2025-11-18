@@ -1,6 +1,5 @@
 "use client"
 import { getCapacityStatus } from "@/lib/shifts"
-import { formatTime12Hour } from "@/lib/utils"
 
 type ShiftIndicatorProps = {
   slot: "AM" | "MID" | "PM"
@@ -24,7 +23,17 @@ export function ShiftIndicator({
   const capacityStatus = getCapacityStatus(capacity, assignmentsCount)
   const status = isAssigned ? "registered" : capacityStatus
 
-  const timeLabel = `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`
+  // Format time to be more readable (e.g., "09:00:00" -> "9am")
+  const formatTime = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(":").map(Number)
+    const period = hours >= 12 ? "PM" : "AM"
+    const displayHours = hours % 12 || 12
+    // If minutes is 0, don't show it to save space in the small indicator
+    const displayMinutes = minutes > 0 ? `:${minutes.toString().padStart(2, "0")}` : ""
+    return `${displayHours}${displayMinutes}${period}`
+  }
+
+  const timeLabel = `${formatTime(startTime)}-${formatTime(endTime)}`
 
   const statusColors = {
     registered: "bg-blue-600 hover:bg-blue-700",

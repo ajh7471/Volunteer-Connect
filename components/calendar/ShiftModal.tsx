@@ -13,8 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Clock, Users, Calendar } from 'lucide-react'
 import { getCapacityStatus, type ShiftWithCapacity } from "@/lib/shifts"
-import { parseDate } from "@/lib/date"
-import { formatTime12Hour } from "@/lib/utils"
+import { parseDate, formatTime12Hour } from "@/lib/date"
 
 type ShiftModalProps = {
   shift: ShiftWithCapacity | null

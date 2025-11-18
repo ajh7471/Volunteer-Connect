@@ -58,3 +58,11 @@ export function formatDateForDisplay(dateString: string, options?: Intl.DateTime
   const date = parseDate(dateString)
   return date.toLocaleDateString("default", options)
 }
+
+export function formatTime12Hour(time: string): string {
+  if (!time) return ""
+  const [hours, minutes] = time.split(":").map(Number)
+  const period = hours >= 12 ? "PM" : "AM"
+  const hours12 = hours % 12 || 12
+  return `${hours12}:${minutes.toString().padStart(2, "0")} ${period}`
+}
