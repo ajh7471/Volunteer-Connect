@@ -8,11 +8,19 @@ type DayCellProps = {
   date: Date
   currentMonth: Date
   shifts: ShiftWithCapacity[]
+  userAssignments: Set<string>
   onDayClick: (date: Date) => void
   onShiftClick?: (shift: ShiftWithCapacity) => void
 }
 
-export function DayCell({ date, currentMonth, shifts, onDayClick, onShiftClick }: DayCellProps) {
+export function DayCell({
+  date,
+  currentMonth,
+  shifts,
+  userAssignments,
+  onDayClick,
+  onShiftClick,
+}: DayCellProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0) // Reset time to midnight for accurate date comparison
 
@@ -80,6 +88,7 @@ export function DayCell({ date, currentMonth, shifts, onDayClick, onShiftClick }
             endTime={amShift.end_time}
             capacity={amShift.capacity}
             assignmentsCount={amShift.assignments_count}
+            isAssigned={userAssignments.has(amShift.id)}
             onClick={() => handleShiftClick(amShift)}
           />
         )}
@@ -90,6 +99,7 @@ export function DayCell({ date, currentMonth, shifts, onDayClick, onShiftClick }
             endTime={midShift.end_time}
             capacity={midShift.capacity}
             assignmentsCount={midShift.assignments_count}
+            isAssigned={userAssignments.has(midShift.id)}
             onClick={() => handleShiftClick(midShift)}
           />
         )}
@@ -100,6 +110,7 @@ export function DayCell({ date, currentMonth, shifts, onDayClick, onShiftClick }
             endTime={pmShift.end_time}
             capacity={pmShift.capacity}
             assignmentsCount={pmShift.assignments_count}
+            isAssigned={userAssignments.has(pmShift.id)}
             onClick={() => handleShiftClick(pmShift)}
           />
         )}

@@ -320,6 +320,10 @@ export default function CalendarPage() {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
+              <div className="h-6 w-12 rounded bg-blue-600"></div>
+              <span className="text-sm">Registered</span>
+            </div>
+            <div className="flex items-center gap-2">
               <div className="h-6 w-12 rounded bg-green-500"></div>
               <span className="text-sm">Available</span>
             </div>
@@ -350,6 +354,7 @@ export default function CalendarPage() {
               <MonthlyGrid 
                 currentMonth={currentMonth} 
                 shifts={shifts} 
+                userAssignments={userAssignments}
                 onDayClick={handleDayClick} 
                 onShiftClick={handleShiftClick}
               />

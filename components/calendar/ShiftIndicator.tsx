@@ -7,11 +7,21 @@ type ShiftIndicatorProps = {
   endTime: string
   capacity: number
   assignmentsCount: number
+  isAssigned?: boolean
   onClick?: () => void
 }
 
-export function ShiftIndicator({ slot, startTime, endTime, capacity, assignmentsCount, onClick }: ShiftIndicatorProps) {
-  const status = getCapacityStatus(capacity, assignmentsCount)
+export function ShiftIndicator({
+  slot,
+  startTime,
+  endTime,
+  capacity,
+  assignmentsCount,
+  isAssigned = false,
+  onClick,
+}: ShiftIndicatorProps) {
+  const capacityStatus = getCapacityStatus(capacity, assignmentsCount)
+  const status = isAssigned ? "registered" : capacityStatus
 
   // Format time to be more readable (e.g., "09:00:00" -> "9am")
   const formatTime = (timeStr: string) => {
@@ -24,6 +34,7 @@ export function ShiftIndicator({ slot, startTime, endTime, capacity, assignments
   const timeLabel = `${formatTime(startTime)}-${formatTime(endTime)}`
 
   const statusColors = {
+    registered: "bg-blue-600 hover:bg-blue-700",
     available: "bg-green-500 hover:bg-green-600",
     "nearly-full": "bg-orange-500 hover:bg-orange-600",
     full: "bg-red-500 hover:bg-red-600",
@@ -31,6 +42,7 @@ export function ShiftIndicator({ slot, startTime, endTime, capacity, assignments
   }
 
   const statusLabels = {
+    registered: "Registered",
     available: "Available",
     "nearly-full": "Nearly Full",
     full: "Full",
