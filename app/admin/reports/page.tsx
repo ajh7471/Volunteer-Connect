@@ -6,7 +6,7 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Users, TrendingUp, Download, FileText, BarChart } from 'lucide-react'
+import { Calendar, Users, TrendingUp, Download, FileText, BarChart, Clock, ArrowRight } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import {
   getDashboardStats,
@@ -76,7 +76,7 @@ export default function ReportsPage() {
       if (statsRes.status === "fulfilled" && statsRes.value.success) {
         setDashboardStats(statsRes.value.data)
       }
-      
+
       if (shiftStatsRes.status === "fulfilled" && shiftStatsRes.value.success) {
         setShiftStats(shiftStatsRes.value.data || null)
       }
@@ -232,12 +232,60 @@ export default function ReportsPage() {
           </Card>
         </div>
 
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/admin/reports/attendance")}>
+            <CardHeader>
+              <Clock className="mb-2 h-8 w-8 text-primary" />
+              <CardTitle>Attendance Report</CardTitle>
+              <CardDescription>Track volunteer hours and shift attendance history</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="ghost" className="w-full justify-between">
+                View Report
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/admin/reports/shift-analytics")}>
+            <CardHeader>
+              <BarChart className="mb-2 h-8 w-8 text-primary" />
+              <CardTitle>Shift Analytics</CardTitle>
+              <CardDescription>Analyze shift fill rates and capacity utilization</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="ghost" className="w-full justify-between">
+                View Analytics
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <Download className="mb-2 h-8 w-8 text-primary" />
+              <CardTitle>Quick Exports</CardTitle>
+              <CardDescription>Download data in CSV format</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button variant="outline" size="sm" onClick={handleExportVolunteers} className="w-full">
+                Export Volunteers
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportShiftReport} className="w-full">
+                Export Shifts
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportAttendance} className="w-full">
+                Export Attendance
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="shifts">Shift Analytics</TabsTrigger>
-            <TabsTrigger value="exports">Export Data</TabsTrigger>
+            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -307,8 +355,10 @@ export default function ReportsPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
 
-            {/* Recent Activity */}
+          {/* Activity Tab */}
+          <TabsContent value="activity" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
@@ -334,65 +384,6 @@ export default function ReportsPage() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* Shift Analytics Tab */}
-          <TabsContent value="shifts" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Detailed Shift Analytics</CardTitle>
-                <CardDescription>Coming soon: Charts and detailed breakdowns</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Advanced shift analytics with charts and trends will be available in the next update.
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Export Tab */}
-          <TabsContent value="exports" className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <Download className="mb-2 h-8 w-8 text-primary" />
-                  <CardTitle>Export Volunteers</CardTitle>
-                  <CardDescription>Download complete volunteer roster</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={handleExportVolunteers} className="w-full">
-                    Download CSV
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <BarChart className="mb-2 h-8 w-8 text-primary" />
-                  <CardTitle>Export Shift Report</CardTitle>
-                  <CardDescription>Last 30 days of shift data</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={handleExportShiftReport} className="w-full">
-                    Download CSV
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <FileText className="mb-2 h-8 w-8 text-primary" />
-                  <CardTitle>Export Attendance</CardTitle>
-                  <CardDescription>Complete attendance records</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={handleExportAttendance} className="w-full">
-                    Download CSV
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>
