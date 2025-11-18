@@ -49,6 +49,8 @@ export default function VolunteerDashboard() {
     const startOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
     const endOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0))
 
+    console.log("[v0] Dashboard date range:", { today, startOfMonth, endOfMonth })
+
     const { data: assignments } = await supabase
       .from("shift_assignments")
       .select(
@@ -66,12 +68,21 @@ export default function VolunteerDashboard() {
       )
       .eq("user_id", userId)
 
+    console.log("[v0] Raw assignments from database:", assignments)
+
     let completedCount = 0
     let totalHours = 0
     const upcoming: UpcomingShift[] = []
 
     if (assignments) {
       assignments.forEach((assignment: any) => {
+        console.log("[v0] Processing assignment:", {
+          id: assignment.id,
+          shift_date: assignment.shifts?.shift_date,
+          status: assignment.status,
+          comparison: assignment.shifts?.shift_date >= today,
+        })
+
         // Process completed stats
         if (assignment.status === "completed") {
           completedCount++
@@ -100,9 +111,20 @@ export default function VolunteerDashboard() {
       // Sort upcoming shifts by date
       upcoming.sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
-      setUpcomingShifts(upcoming.slice(0, 3))
+      console.log("[v0] All upcoming shifts:", upcoming)
 
       const thisMonth = upcoming.filter((s) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth)
+      
+      console.log("[v0] This month's shifts:", thisMonth)
+      console.log("[v0] Filter logic:", {
+        startOfMonth,
+        endOfMonth,
+        exampleShift: upcoming[0],
+        passesFilter: upcoming[0] ? (upcoming[0].shift_date >= startOfMonth && upcoming[0].shift_date <= endOfMonth) : 'no shifts',
+      })
+
+      setUpcomingShifts(upcoming.slice(0, 3))
+
       setThisMonthShifts(thisMonth)
 
       setStats({
