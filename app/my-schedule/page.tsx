@@ -12,6 +12,7 @@ import { toast } from "@/lib/toast"
 import Link from "next/link"
 import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
 import { leaveWaitlist, acceptWaitlistSpot } from "@/app/admin/shift-management-actions"
+import { formatTime12Hour } from "@/lib/utils"
 
 type Assignment = {
   id: string
@@ -204,7 +205,7 @@ export default function MySchedulePage() {
     const event: CalendarEvent = {
       id: assignment.id,
       summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
-      description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}\nDate: ${parseDate(assignment.shift_date).toLocaleDateString()}`,
+      description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${formatTime12Hour(assignment.start_time)} - ${formatTime12Hour(assignment.end_time)}\nDate: ${parseDate(assignment.shift_date).toLocaleDateString()}`,
       location: "Vanderpump Dogs, Los Angeles, CA",
       startDate: startDateTime,
       endDate: endDateTime,
@@ -234,7 +235,7 @@ export default function MySchedulePage() {
       return {
         id: assignment.id,
         summary: `Volunteer Shift - ${assignment.slot === "AM" ? "Morning" : assignment.slot === "MID" ? "Midday" : "Afternoon"}`,
-        description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${assignment.start_time} - ${assignment.end_time}`,
+        description: `Your volunteer shift at Vanderpump Dogs.\n\nTime: ${formatTime12Hour(assignment.start_time)} - ${formatTime12Hour(assignment.end_time)}`,
         location: "Vanderpump Dogs, Los Angeles, CA",
         startDate: startDateTime,
         endDate: endDateTime,
@@ -355,7 +356,7 @@ export default function MySchedulePage() {
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-4 w-4" />
                           <span>
-                            {entry.start_time} - {entry.end_time}
+                            {formatTime12Hour(entry.start_time)} - {formatTime12Hour(entry.end_time)}
                           </span>
                         </div>
                       </div>
@@ -418,7 +419,7 @@ export default function MySchedulePage() {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="h-4 w-4" />
                       <span>
-                        {assignment.start_time} - {assignment.end_time}
+                        {formatTime12Hour(assignment.start_time)} - {formatTime12Hour(assignment.end_time)}
                       </span>
                     </div>
 

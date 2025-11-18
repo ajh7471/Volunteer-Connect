@@ -13,18 +13,15 @@ export function useSessionRole() {
   useEffect(() => {
     let mounted = true
 
-    async function load() {
-      console.log("[v0] useSessionRole: Loading user session...")
-      setLoading(true)
+    async function load(shouldSetLoading = true) {
+      if (shouldSetLoading) setLoading(true)
       const { data: auth } = await supabase.auth.getUser()
       const uid = auth.user?.id || null
-      console.log("[v0] useSessionRole: User ID:", uid)
 
       if (!mounted) return
       setUserId(uid)
 
       if (!uid) {
-        console.log("[v0] useSessionRole: No user, setting role to null")
         setRole(null)
         setLoading(false)
         return
@@ -34,13 +31,12 @@ export function useSessionRole() {
 
       if (!mounted) return
       if (error) {
-        console.error("[v0] useSessionRole: Error fetching role:", error)
+        console.error("Error fetching role:", error)
         setRole(null)
         setLoading(false)
         return
       }
       const userRole = (data?.role as Role) || "volunteer"
-      console.log("[v0] useSessionRole: Role loaded:", userRole)
       setRole(userRole)
       setLoading(false)
     }
@@ -50,7 +46,6 @@ export function useSessionRole() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[v0] useSessionRole: Auth state changed:", event, "Session:", !!session)
       if (!mounted) return
 
       if (event === "SIGNED_OUT") {
@@ -62,7 +57,7 @@ export function useSessionRole() {
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         // Reload user data when auth state changes
-        await load()
+        await load(false)
       }
     })
 

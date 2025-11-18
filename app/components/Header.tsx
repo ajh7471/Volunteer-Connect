@@ -31,18 +31,14 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
 
-  console.log("[v0] Header render - userId:", userId, "role:", role, "loading:", loading)
-
   const signOut = async () => {
-    console.log("[v0] Header: Starting sign out...")
     setSigningOut(true)
 
     try {
       // Wait for sign out to complete
       await supabase.auth.signOut()
-      console.log("[v0] Header: Sign out completed, redirecting...")
     } catch (error) {
-      console.error("[v0] Header: Sign out error:", error)
+      console.error("Sign out error:", error)
     }
 
     // Use hard redirect for complete state clearing

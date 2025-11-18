@@ -37,9 +37,16 @@ export function ShiftIndicator({ slot, startTime, endTime, capacity, assignments
     none: "Not Available",
   }
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (onClick) {
+      e.stopPropagation()
+      onClick()
+    }
+  }
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={`${statusColors[status]} group relative flex h-6 w-full items-center justify-center rounded text-xs font-medium text-white transition-colors`}
       title={`${timeLabel}: ${assignmentsCount}/${capacity} - ${statusLabels[status]}`}
     >

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
 import { MonthlyGrid } from "@/components/calendar/MonthlyGrid"
+import { ShiftModal } from "@/components/calendar/ShiftModal"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,7 @@ import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStat
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
 import { joinWaitlist } from "@/app/admin/shift-management-actions"
+import Link from "next/link"
 
 export default function CalendarPage() {
   const router = useRouter()
@@ -20,6 +22,8 @@ export default function CalendarPage() {
   const [shifts, setShifts] = useState<ShiftWithCapacity[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedShift, setSelectedShift] = useState<ShiftWithCapacity | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [userAssignments, setUserAssignments] = useState<Set<string>>(new Set())
   const [signingUpShifts, setSigningUpShifts] = useState<Set<string>>(new Set())
@@ -107,6 +111,13 @@ export default function CalendarPage() {
     setSelectedDate(date)
   }
 
+  function handleShiftClick(shift: ShiftWithCapacity) {
+    setSelectedShift(shift)
+    setIsModalOpen(true)
+    // Pre-load attendees when opening modal
+    loadShiftAttendees(shift.id)
+  }
+
   async function loadShiftAttendees(shiftId: string) {
     if (shiftAttendees[shiftId] || loadingAttendees.has(shiftId)) return
 
@@ -157,9 +168,58 @@ export default function CalendarPage() {
     if (result.success) {
       toast.success("Successfully signed up for shift!")
       await loadMonthData()
+      // Update selected shift data if modal is open
+      if (selectedShift && selectedShift.id === shiftId) {
+        // We need to refresh the selected shift data from the new shifts array
+        // But loadMonthData updates 'shifts' state asynchronously.
+        // For now, we'll just close the modal or let the user see the update on next render if we could sync it.
+        // Actually, since we await loadMonthData, 'shifts' should be updated? 
+        // No, state updates are batched/async. 
+        // But we can just close it for a simple UX, or keep it open.
+        // Let's keep it open but we need to update the 'selectedShift' object to reflect new counts.
+        // We'll handle that in a useEffect or just close it.
+        // Closing it is safer to avoid stale data display.
+        setIsModalOpen(false)
+      }
       setSelectedDate(null)
     } else {
       toast.error(result.error || "Failed to sign up")
+    }
+
+    setSigningUpShifts((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(shiftId)
+      return newSet
+    })
+  }
+
+  async function handleRemoveFromShift(shiftId: string) {
+    if (!userId) return
+    if (!confirm("Are you sure you want to remove yourself from this shift?")) return
+
+    setSigningUpShifts((prev) => new Set(prev).add(shiftId))
+
+    // Find assignment ID first
+    const { data } = await supabase
+      .from("shift_assignments")
+      .select("id")
+      .eq("shift_id", shiftId)
+      .eq("user_id", userId)
+      .single()
+
+    if (data) {
+      const { error } = await supabase.from("shift_assignments").delete().eq("id", data.id)
+
+      if (error) {
+        toast.error("Failed to cancel signup")
+      } else {
+        toast.success("Signup cancelled successfully")
+        await loadMonthData()
+        setIsModalOpen(false)
+        setSelectedDate(null)
+      }
+    } else {
+      toast.error("Assignment not found")
     }
 
     setSigningUpShifts((prev) => {
@@ -193,6 +253,7 @@ export default function CalendarPage() {
     if (result.success) {
       toast.success(`Joined waitlist! You're position #${result.position}`)
       await loadMonthData()
+      setIsModalOpen(false)
     } else {
       toast.error(result.error || "Failed to join waitlist")
     }
@@ -228,9 +289,14 @@ export default function CalendarPage() {
   return (
     <RequireAuth>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Volunteer Calendar</h1>
-          <p className="text-muted-foreground">View available shifts and sign up</p>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Volunteer Calendar</h1>
+            <p className="text-muted-foreground">View available shifts and sign up</p>
+          </div>
+          <Button asChild>
+            <Link href="/my-schedule">View My Schedule</Link>
+          </Button>
         </div>
 
         <Card>
@@ -281,7 +347,12 @@ export default function CalendarPage() {
                 </CardContent>
               </Card>
             ) : (
-              <MonthlyGrid currentMonth={currentMonth} shifts={shifts} onDayClick={handleDayClick} />
+              <MonthlyGrid 
+                currentMonth={currentMonth} 
+                shifts={shifts} 
+                onDayClick={handleDayClick} 
+                onShiftClick={handleShiftClick}
+              />
             )}
           </div>
 
@@ -475,6 +546,21 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      <ShiftModal
+        shift={selectedShift}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        userId={userId}
+        isAssigned={selectedShift ? userAssignments.has(selectedShift.id) : false}
+        isSigningUp={selectedShift ? signingUpShifts.has(selectedShift.id) : false}
+        attendees={selectedShift ? shiftAttendees[selectedShift.id] : undefined}
+        isLoadingAttendees={selectedShift ? loadingAttendees.has(selectedShift.id) : false}
+        onSignUp={handleSignUp}
+        onCancel={handleRemoveFromShift}
+        onJoinWaitlist={handleJoinWaitlist}
+        onLoadAttendees={loadShiftAttendees}
+      />
     </RequireAuth>
   )
 }
