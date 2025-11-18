@@ -449,7 +449,7 @@ export default function MySchedulePage() {
                             <div className="bg-muted/30 rounded-md p-3 text-center">
                               <Users className="h-5 w-5 text-muted-foreground mx-auto mb-1" />
                               <p className="text-xs text-muted-foreground">
-                                No other volunteers have signed up yet. You'll be the first on your team!
+                                No other volunteers have signed up yet. You are the only one. Ask a friend to join you!
                               </p>
                             </div>
                           ) : (
