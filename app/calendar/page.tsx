@@ -37,7 +37,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     loadMonthData()
-  }, [currentMonth])
+  }, [currentMonth, userId])
 
   async function loadUser() {
     const { data } = await supabase.auth.getUser()
@@ -69,6 +69,8 @@ export default function CalendarPage() {
       } else {
         setUserAssignments(new Set())
       }
+    } else {
+      setUserAssignments(new Set())
     }
 
     setLoading(false)
