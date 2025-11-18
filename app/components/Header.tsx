@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from "@/lib/supabaseClient"
 import { useSessionRole } from "@/lib/useSession"
 import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
+import { Menu, X } from 'lucide-react'
 import { useState } from "react"
 
 function NavLink({ href, label, onClick }: { href: string; label: string; onClick?: () => void }) {
@@ -46,7 +46,7 @@ export default function Header() {
     }
 
     // Use hard redirect for complete state clearing
-    window.location.href = "/auth/login"
+    window.location.href = "/"
   }
 
   return (
@@ -59,6 +59,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 md:flex">
+            {!userId && <NavLink href="/about" label="About" />}
             {userId && role === "volunteer" && <NavLink href="/volunteer" label="Dashboard" />}
             {userId && <NavLink href="/calendar" label="Calendar" />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" />}
@@ -77,7 +78,7 @@ export default function Header() {
             ) : (
               <>
                 <Button asChild variant="ghost" size="sm">
-                  <Link href="/auth/login">Login</Link>
+                  <Link href="/">Login</Link>
                 </Button>
                 <Button asChild variant="default" size="sm">
                   <Link href="/auth/signup">Sign Up</Link>
@@ -95,6 +96,7 @@ export default function Header() {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <nav className="flex flex-col gap-2 py-4 md:hidden">
+            {!userId && <NavLink href="/about" label="About" onClick={() => setMobileMenuOpen(false)} />}
             {userId && role === "volunteer" && (
               <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} />
             )}
@@ -110,7 +112,7 @@ export default function Header() {
               ) : (
                 <>
                   <Button asChild variant="ghost" size="sm" className="w-full">
-                    <Link href="/auth/login">Login</Link>
+                    <Link href="/">Login</Link>
                   </Button>
                   <Button asChild variant="default" size="sm" className="w-full">
                     <Link href="/auth/signup">Sign Up</Link>
