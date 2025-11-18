@@ -51,13 +51,12 @@ export default function VolunteerDashboard() {
 
     console.log("[v0] Dashboard date range:", { today, startOfMonth, endOfMonth })
 
-    const { data: assignments } = await supabase
+    const { data: assignments, error } = await supabase
       .from("shift_assignments")
       .select(
         `
         id,
         shift_id,
-        status,
         shifts (
           shift_date,
           start_time,
@@ -69,38 +68,43 @@ export default function VolunteerDashboard() {
       .eq("user_id", userId)
 
     console.log("[v0] Raw assignments from database:", assignments)
+    console.log("[v0] Query error (if any):", error)
 
     let completedCount = 0
     let totalHours = 0
     const upcoming: UpcomingShift[] = []
 
-    if (assignments) {
+    if (assignments && assignments.length > 0) {
       assignments.forEach((assignment: any) => {
+        if (!assignment.shifts) {
+          console.log("[v0] Skipping assignment with null shift:", assignment.id)
+          return
+        }
+
+        const shiftDate = assignment.shifts.shift_date
+
         console.log("[v0] Processing assignment:", {
           id: assignment.id,
-          shift_date: assignment.shifts?.shift_date,
-          status: assignment.status,
-          comparison: assignment.shifts?.shift_date >= today,
+          shift_date: shiftDate,
+          comparison: shiftDate >= today,
+          isUpcoming: shiftDate >= today,
+          isPast: shiftDate < today,
         })
 
-        // Process completed stats
-        if (assignment.status === "completed") {
+        if (shiftDate < today) {
           completedCount++
-          const start = assignment.shifts?.start_time
-          const end = assignment.shifts?.end_time
+          const start = assignment.shifts.start_time
+          const end = assignment.shifts.end_time
           if (start && end) {
             const [startHour, startMin] = start.split(":").map(Number)
             const [endHour, endMin] = end.split(":").map(Number)
             const hours = endHour - startHour + (endMin - startMin) / 60
             totalHours += hours
           }
-        }
-
-        // Process upcoming shifts
-        if (assignment.shifts?.shift_date >= today) {
+        } else {
           upcoming.push({
             id: assignment.id,
-            shift_date: assignment.shifts.shift_date,
+            shift_date: shiftDate,
             start_time: assignment.shifts.start_time,
             end_time: assignment.shifts.end_time,
             slot: assignment.shifts.slot,
@@ -108,7 +112,6 @@ export default function VolunteerDashboard() {
         }
       })
 
-      // Sort upcoming shifts by date
       upcoming.sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
       console.log("[v0] All upcoming shifts:", upcoming)
@@ -133,6 +136,16 @@ export default function VolunteerDashboard() {
         nextShift: upcoming[0] || null,
         totalCompletedShifts: completedCount,
         totalHoursWorked: Math.round(totalHours * 10) / 10,
+      })
+    } else {
+      setUpcomingShifts([])
+      setThisMonthShifts([])
+      setStats({
+        totalUpcoming: 0,
+        thisMonth: 0,
+        nextShift: null,
+        totalCompletedShifts: 0,
+        totalHoursWorked: 0,
       })
     }
 
