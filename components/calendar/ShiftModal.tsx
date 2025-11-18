@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, Clock, Users, Calendar } from 'lucide-react'
 import { getCapacityStatus, type ShiftWithCapacity } from "@/lib/shifts"
 import { parseDate } from "@/lib/date"
+import { formatTime12Hour } from "@/lib/utils"
 
 type ShiftModalProps = {
   shift: ShiftWithCapacity | null
@@ -96,7 +97,7 @@ export function ShiftModal({
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  {shift.start_time} - {shift.end_time} ({shift.slot})
+                  {formatTime12Hour(shift.start_time)} - {formatTime12Hour(shift.end_time)} ({shift.slot})
                 </span>
               </div>
               <div className="text-sm text-muted-foreground">

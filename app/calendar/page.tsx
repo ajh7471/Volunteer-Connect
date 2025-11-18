@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
 import { joinWaitlist } from "@/app/admin/shift-management-actions"
 import Link from "next/link"
+import { formatTime12Hour } from "@/lib/utils"
 
 export default function CalendarPage() {
   const router = useRouter()
@@ -374,7 +375,7 @@ export default function CalendarPage() {
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium text-sm">
-                              {shift.start_time} - {shift.end_time}
+                              {formatTime12Hour(shift.start_time)} - {formatTime12Hour(shift.end_time)}
                             </span>
                           </div>
                           <Badge

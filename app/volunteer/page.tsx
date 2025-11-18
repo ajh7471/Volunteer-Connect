@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, Loader2, ArrowRight, Award } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import { ymd, parseDate } from "@/lib/date"
+import { formatTime12Hour } from "@/lib/utils"
 
 type UpcomingShift = {
   id: string
@@ -287,7 +288,7 @@ export default function VolunteerDashboard() {
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Clock className="h-4 w-4" />
                             <span>
-                              {shift.start_time} - {shift.end_time}
+                              {formatTime12Hour(shift.start_time)} - {formatTime12Hour(shift.end_time)}
                             </span>
                           </div>
                         </div>
