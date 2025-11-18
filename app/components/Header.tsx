@@ -59,7 +59,6 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 md:flex">
-            {!userId && <NavLink href="/about" label="About" />}
             {userId && role === "volunteer" && <NavLink href="/volunteer" label="Dashboard" />}
             {userId && <NavLink href="/calendar" label="Calendar" />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" />}
@@ -83,6 +82,9 @@ export default function Header() {
                 <Button asChild variant="default" size="sm">
                   <Link href="/auth/signup">Sign Up</Link>
                 </Button>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/about">About</Link>
+                </Button>
               </>
             )}
           </div>
@@ -96,7 +98,6 @@ export default function Header() {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <nav className="flex flex-col gap-2 py-4 md:hidden">
-            {!userId && <NavLink href="/about" label="About" onClick={() => setMobileMenuOpen(false)} />}
             {userId && role === "volunteer" && (
               <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} />
             )}
@@ -116,6 +117,9 @@ export default function Header() {
                   </Button>
                   <Button asChild variant="default" size="sm" className="w-full">
                     <Link href="/auth/signup">Sign Up</Link>
+                  </Button>
+                  <Button asChild variant="ghost" size="sm" className="w-full">
+                    <Link href="/about">About</Link>
                   </Button>
                 </>
               )}
