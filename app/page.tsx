@@ -48,18 +48,6 @@ export default function HomePage() {
   return (
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center py-12">
       <div className="w-full max-w-md space-y-6">
-        <Alert className="border-primary/20 bg-primary/5">
-          <Info className="h-4 w-4 text-primary" />
-          <AlertDescription className="ml-2">
-            <span className="text-sm">
-              New to Volunteer Hub?{" "}
-              <Link href="/about" className="font-medium text-primary underline hover:text-primary/80">
-                Learn more about our platform
-              </Link>
-            </span>
-          </AlertDescription>
-        </Alert>
-
         <Card className="w-full">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
