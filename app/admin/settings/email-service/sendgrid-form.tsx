@@ -134,3 +134,5 @@ export function SendGridForm({ config }: { config?: SendGridConfig }) {
     </Card>
   )
 }
+
+export default SendGridForm

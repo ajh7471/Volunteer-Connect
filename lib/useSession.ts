@@ -13,7 +13,7 @@ export function useSessionRole() {
   useEffect(() => {
     let mounted = true
 
-    async function load(shouldSetLoading = true) {
+    async function load(shouldSetLoading: boolean = true) {
       if (shouldSetLoading) setLoading(true)
       const { data: auth } = await supabase.auth.getUser()
       const uid = auth.user?.id || null

@@ -115,7 +115,7 @@ export default function SignupPage() {
         toast.success("Account created! Please check your email to verify your account.")
         router.push("/volunteer")
       }
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create account"
       setError(errorMessage)
     } finally {

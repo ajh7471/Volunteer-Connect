@@ -115,8 +115,8 @@ export default function MySchedulePage() {
       const assignmentsData = assignmentsResult.data || []
 
       const upcomingAssignments = assignmentsData
-        .filter((a) => a.shifts && a.shifts.shift_date && a.shifts.shift_date >= today)
-        .map((a) => ({
+        .filter((a: AssignmentWithRelations) => a.shifts && a.shifts.shift_date && a.shifts.shift_date >= today)
+        .map((a: AssignmentWithRelations) => ({
           id: a.id,
           shift_id: a.shift_id,
           shift_date: a.shifts?.shift_date || '',
@@ -127,8 +127,8 @@ export default function MySchedulePage() {
         .sort((a: Assignment, b: Assignment) => a.shift_date.localeCompare(b.shift_date))
 
       const pastAssignments = assignmentsData
-        .filter((a) => a.shifts && a.shifts.shift_date && a.shifts.shift_date < today)
-        .map((a) => ({
+        .filter((a: AssignmentWithRelations) => a.shifts && a.shifts.shift_date && a.shifts.shift_date < today)
+        .map((a: AssignmentWithRelations) => ({
           id: a.id,
           shift_id: a.shift_id,
           shift_date: a.shifts?.shift_date || '',
@@ -144,7 +144,19 @@ export default function MySchedulePage() {
 
     // Process Waitlist
     if (waitlistResult.data) {
-      const formattedWaitlist = (waitlistResult.data as any[])
+      const formattedWaitlist = (waitlistResult.data as Array<{
+        id: string;
+        shift_id: string;
+        position: number;
+        status: string;
+        joined_at: string;
+        shifts: {
+          shift_date: string;
+          slot: string;
+          start_time: string;
+          end_time: string;
+        } | null;
+      }>)
         .filter((w) => w.shifts && w.shifts.shift_date && w.shifts.shift_date >= today)
         .map((w) => ({
           id: w.id,
@@ -152,10 +164,10 @@ export default function MySchedulePage() {
           position: w.position,
           status: w.status,
           joined_at: w.joined_at,
-          shift_date: w.shifts.shift_date,
-          slot: w.shifts.slot,
-          start_time: w.shifts.start_time,
-          end_time: w.shifts.end_time,
+          shift_date: w.shifts!.shift_date,
+          slot: w.shifts!.slot,
+          start_time: w.shifts!.start_time,
+          end_time: w.shifts!.end_time,
         }))
         .sort((a: WaitlistEntry, b: WaitlistEntry) => a.shift_date.localeCompare(b.shift_date))
 
@@ -288,8 +300,8 @@ export default function MySchedulePage() {
     const teamMembers =
       !error && data
         ? data
-            .filter((a) => a.profiles && a.id !== shiftId)
-            .map((a) => ({
+            .filter((a: { profiles: { id: string; name: string; email: string; phone: string | null } | null; id: string }) => a.profiles && a.id !== shiftId)
+            .map((a: { profiles: { id: string; name: string; email: string; phone: string | null } | null; id: string }) => ({
               id: a.profiles?.id || '',
               name: a.profiles?.name || "Anonymous",
               email: a.profiles?.email || "",

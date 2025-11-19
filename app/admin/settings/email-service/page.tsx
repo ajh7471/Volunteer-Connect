@@ -1,12 +1,15 @@
+"use client"
+
+import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect } from "react"
 import { Suspense } from "react"
+import SendGridForm from "./sendgrid-form"
+import GmailForm from "./gmail-form"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getEmailServiceConfigs } from "@/app/admin/email-service-actions"
-import { AlertCircle, CheckCircle2, Mail, Settings } from 'lucide-react'
-import { SendGridForm } from "./sendgrid-form"
-import { GmailForm } from "./gmail-form"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CheckCircle2, XCircle, AlertCircle, Mail, Settings } from 'lucide-react'
 
 interface EmailServiceConfig {
   id: string
@@ -21,14 +24,31 @@ interface EmailServiceConfig {
   gmail_client_secret?: string
   gmail_refresh_token?: string
   gmail_from_email?: string
-  validation_error?: string | null
+  validation_error: string | null
   created_at?: string
   updated_at?: string
 }
 
+type SendGridConfig = EmailServiceConfig & {
+  service_name: "sendgrid"
+  sendgrid_api_key: string
+  sendgrid_from_email: string
+  sendgrid_from_name: string
+  is_validated: boolean
+}
+
+type GmailConfig = EmailServiceConfig & {
+  service_name: "gmail"
+  gmail_client_id: string
+  gmail_client_secret: string
+  gmail_refresh_token: string
+  gmail_from_email: string
+  is_validated: boolean
+}
+
 function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[] }) {
-  const sendgridConfig = configs.find((c) => c.service_name === "sendgrid")
-  const gmailConfig = configs.find((c) => c.service_name === "gmail")
+  const sendgridConfig = configs.find((c) => c.service_name === "sendgrid" && c.sendgrid_api_key) as SendGridConfig | undefined
+  const gmailConfig = configs.find((c) => c.service_name === "gmail" && c.gmail_client_id) as GmailConfig | undefined
 
   return (
     <div className="space-y-6">
@@ -178,8 +198,18 @@ function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[]
   )
 }
 
-export default async function EmailServicePage() {
-  const configs = await getEmailServiceConfigs()
+export default function EmailServicePage() {
+  const [configs, setConfigs] = useState<EmailServiceConfig[]>([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    const fetchConfigs = async () => {
+      const { data } = await supabase.from('email_service_config').select('*')
+      setConfigs(data || [])
+    }
+
+    fetchConfigs()
+  }, [])
 
   return (
     <div className="container mx-auto py-8 max-w-4xl">
@@ -190,7 +220,9 @@ export default async function EmailServicePage() {
         </p>
       </div>
 
-      <EmailServiceConfigurations configs={configs} />
+      <Suspense fallback={<div>Loading...</div>}>
+        <EmailServiceConfigurations configs={configs} />
+      </Suspense>
     </div>
   )
 }

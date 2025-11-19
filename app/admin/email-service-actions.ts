@@ -228,7 +228,7 @@ export async function validateSendGridConfig(configId: string) {
     } else {
       throw new Error("SendGrid validation failed")
     }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     // Update validation error
     await supabase
@@ -309,7 +309,7 @@ export async function validateGmailConfig(configId: string) {
     } else {
       throw new Error("Gmail validation failed")
     }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     await supabase
       .from("email_service_config")

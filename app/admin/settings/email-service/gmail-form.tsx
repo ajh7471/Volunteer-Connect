@@ -146,3 +146,5 @@ export function GmailForm({ config }: { config?: GmailConfig }) {
     </Card>
   )
 }
+
+export default GmailForm
