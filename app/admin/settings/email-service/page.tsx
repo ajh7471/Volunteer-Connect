@@ -25,7 +25,7 @@ interface EmailServiceConfig {
   gmail_client_secret?: string
   gmail_refresh_token?: string
   gmail_from_email?: string
-  validation_error?: string | null
+  validation_error: string | null
   created_at?: string
   updated_at?: string
 }
