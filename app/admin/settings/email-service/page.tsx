@@ -1,12 +1,16 @@
+"use client"
+
+import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect } from "react"
 import { Suspense } from "react"
+import SendGridForm from "./sendgrid-form"
+import GmailForm from "./gmail-form"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getEmailServiceConfigs } from "@/app/admin/email-service-actions"
-import { AlertCircle, CheckCircle2, Mail, Settings } from 'lucide-react'
-import { SendGridForm } from "./sendgrid-form"
-import { GmailForm } from "./gmail-form"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CheckCircle2, XCircle, AlertCircle, Mail, Settings } from 'lucide-react'
 
 interface EmailServiceConfig {
   id: string
@@ -32,6 +36,7 @@ type SendGridConfig = {
   sendgrid_from_email: string
   sendgrid_from_name: string
   is_active: boolean
+  is_validated: boolean
   validation_error: string | null
 }
 
@@ -42,6 +47,7 @@ type GmailConfig = {
   gmail_refresh_token: string
   gmail_from_email: string
   is_active: boolean
+  is_validated: boolean
   validation_error: string | null
 }
 
@@ -197,8 +203,18 @@ function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[]
   )
 }
 
-export default async function EmailServicePage() {
-  const configs = await getEmailServiceConfigs()
+export default function EmailServicePage() {
+  const [configs, setConfigs] = useState<EmailServiceConfig[]>([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    const fetchConfigs = async () => {
+      const { data } = await supabase.from('email_service_configs').select('*')
+      setConfigs(data || [])
+    }
+
+    fetchConfigs()
+  }, [])
 
   return (
     <div className="container mx-auto py-8 max-w-4xl">
@@ -209,7 +225,9 @@ export default async function EmailServicePage() {
         </p>
       </div>
 
-      <EmailServiceConfigurations configs={configs} />
+      <Suspense fallback={<div>Loading...</div>}>
+        <EmailServiceConfigurations configs={configs} />
+      </Suspense>
     </div>
   )
 }
