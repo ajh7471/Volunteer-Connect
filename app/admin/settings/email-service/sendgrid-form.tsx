@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Trash2 } from "lucide-react"
+import { AlertCircle, Trash2 } from 'lucide-react'
 import { handleSaveSendGridConfig, handleValidateSendGrid, handleDeleteConfig } from "./actions"
+import { useTransition } from "react"
+import { useRouter } from 'next/navigation'
 
 type SendGridConfig = {
   id: string
@@ -19,6 +21,20 @@ type SendGridConfig = {
 }
 
 export function SendGridForm({ config }: { config?: SendGridConfig }) {
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    
+    startTransition(() => {
+      handleSaveSendGridConfig(formData).then(() => {
+        router.refresh()
+      })
+    })
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -36,7 +52,7 @@ export function SendGridForm({ config }: { config?: SendGridConfig }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={handleSaveSendGridConfig} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="sendgrid-api-key">API Key</Label>
             <Input
@@ -79,7 +95,9 @@ export function SendGridForm({ config }: { config?: SendGridConfig }) {
           </div>
 
           <div className="flex gap-2">
-            <Button type="submit">Save Configuration</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving..." : "Save Configuration"}
+            </Button>
             {config && (
               <>
                 <Button
