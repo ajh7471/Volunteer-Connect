@@ -29,9 +29,10 @@ export function GmailForm({ config }: { config?: GmailConfig }) {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     
-    startTransition(async () => {
-      await handleSaveGmailConfig(formData)
-      router.refresh()
+    startTransition(() => {
+      handleSaveGmailConfig(formData).then(() => {
+        router.refresh()
+      })
     })
   }
 
