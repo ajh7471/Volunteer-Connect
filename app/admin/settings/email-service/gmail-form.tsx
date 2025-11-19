@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Trash2 } from "lucide-react"
+import { AlertCircle, Trash2 } from 'lucide-react'
 import { handleSaveGmailConfig, handleValidateGmail, handleDeleteConfig } from "./actions"
+import { useTransition } from "react"
+import { useRouter } from 'next/navigation'
 
 type GmailConfig = {
   id: string
@@ -20,6 +22,19 @@ type GmailConfig = {
 }
 
 export function GmailForm({ config }: { config?: GmailConfig }) {
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    
+    startTransition(async () => {
+      await handleSaveGmailConfig(formData)
+      router.refresh()
+    })
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -37,7 +52,7 @@ export function GmailForm({ config }: { config?: GmailConfig }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={handleSaveGmailConfig} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="gmail-client-id">OAuth Client ID</Label>
             <Input
@@ -91,7 +106,9 @@ export function GmailForm({ config }: { config?: GmailConfig }) {
           </div>
 
           <div className="flex gap-2">
-            <Button type="submit">Save Configuration</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving..." : "Save Configuration"}
+            </Button>
             {config && (
               <>
                 <Button
