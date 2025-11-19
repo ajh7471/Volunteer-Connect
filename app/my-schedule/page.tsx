@@ -115,8 +115,8 @@ export default function MySchedulePage() {
       const assignmentsData = assignmentsResult.data || []
 
       const upcomingAssignments = assignmentsData
-        .filter((a) => a.shifts && a.shifts.shift_date && a.shifts.shift_date >= today)
-        .map((a) => ({
+        .filter((a: AssignmentWithRelations) => a.shifts && a.shifts.shift_date && a.shifts.shift_date >= today)
+        .map((a: AssignmentWithRelations) => ({
           id: a.id,
           shift_id: a.shift_id,
           shift_date: a.shifts?.shift_date || '',
@@ -127,8 +127,8 @@ export default function MySchedulePage() {
         .sort((a: Assignment, b: Assignment) => a.shift_date.localeCompare(b.shift_date))
 
       const pastAssignments = assignmentsData
-        .filter((a) => a.shifts && a.shifts.shift_date && a.shifts.shift_date < today)
-        .map((a) => ({
+        .filter((a: AssignmentWithRelations) => a.shifts && a.shifts.shift_date && a.shifts.shift_date < today)
+        .map((a: AssignmentWithRelations) => ({
           id: a.id,
           shift_id: a.shift_id,
           shift_date: a.shifts?.shift_date || '',
