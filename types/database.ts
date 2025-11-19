@@ -67,6 +67,30 @@ export interface EmailLog {
   sent_at: string
 }
 
+export interface EmailServiceConfig {
+  id: string
+  service_name: string
+  priority: number
+  is_active: boolean
+  is_validated: boolean
+  validation_error: string | null
+  last_validated_at: string | null
+  sendgrid_api_key: string | null
+  sendgrid_from_name: string | null
+  sendgrid_from_email: string | null
+  gmail_client_id: string | null
+  gmail_client_secret: string | null
+  gmail_refresh_token: string | null
+  gmail_access_token: string | null
+  gmail_token_expiry: string | null
+  gmail_from_email: string | null
+  emails_sent_count: number
+  last_email_sent_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 export interface ShiftFillRate {
   shift_id: string
   shift_date: string
@@ -106,6 +130,51 @@ export interface ShiftTemplate {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export interface EmailTemplate {
+  id: string
+  name: string
+  category: string
+  subject: string
+  body: string
+  variables: Record<string, unknown> | null
+  active: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NotificationPreferences {
+  id: string
+  user_id: string
+  shift_confirmation_email: boolean
+  shift_cancellation_email: boolean
+  shift_reminder_24h_email: boolean
+  shift_reminder_1h_email: boolean
+  shift_reminder_push: boolean
+  last_minute_coverage_push: boolean
+  admin_announcements: boolean
+  newsletter: boolean
+  reminder_hours_before: number
+  quiet_hours_start: string | null
+  quiet_hours_end: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EmergencyCoverageRequest {
+  id: string
+  shift_id: string
+  requested_by: string
+  reason: string
+  urgency: string
+  status: EmergencyCoverageStatus
+  notification_sent: boolean
+  filled_by: string | null
+  filled_at: string | null
+  expires_at: string
+  created_at: string
 }
 
 // View types for queries with joins
