@@ -42,7 +42,7 @@ export async function getMonthShifts(year: number, month: number): Promise<Shift
     return []
   }
 
-  const shiftIds = shifts.map((s) => s.id)
+  const shiftIds = shifts.map((s: { id: string }) => s.id)
   
   const { data: allAssignments, error: assignmentError } = await supabase
     .from("shift_assignments")
