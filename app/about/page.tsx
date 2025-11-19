@@ -9,7 +9,7 @@ export default function AboutPage() {
       {/* Hero Section */}
       <section className="text-center">
         <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-          About <span className="text-primary">Volunteer Connect</span>
+          About <span className="text-primary">Volunteer Hub</span>
         </h1>
         <p className="mx-auto mb-8 max-w-3xl text-balance text-lg text-muted-foreground sm:text-xl">
           We're on a mission to make volunteer coordination simple, efficient, and accessible for everyone. Connect
@@ -28,7 +28,7 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent>
             <p className="text-center text-lg leading-relaxed text-muted-foreground">
-              Volunteer Connect bridges the gap between passionate volunteers and organizations that need help. We
+              Volunteer Hub bridges the gap between passionate volunteers and organizations that need help. We
               believe that giving back should be easy, organized, and rewarding. Our platform streamlines the entire
               volunteer experience—from discovering opportunities to tracking your impact.
             </p>
@@ -38,7 +38,7 @@ export default function AboutPage() {
 
       {/* Features Section */}
       <section>
-        <h2 className="mb-8 text-center text-3xl font-bold">Why Choose Volunteer Connect?</h2>
+        <h2 className="mb-8 text-center text-3xl font-bold">Why Choose Volunteer Hub?</h2>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="transition-shadow hover:shadow-lg">
             <CardHeader>
@@ -181,7 +181,7 @@ export default function AboutPage() {
       <section className="rounded-2xl bg-accent p-8 text-center sm:p-12">
         <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">Ready to Make a Difference?</h2>
         <p className="mx-auto mb-6 max-w-2xl text-lg text-muted-foreground">
-          Join thousands of volunteers who are using Volunteer Connect to organize their giving and maximize their
+          Join thousands of volunteers who are using Volunteer Hub to organize their giving and maximize their
           impact.
         </p>
         <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">

@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter, JetBrains_Mono } from "next/font/google"
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import "./globals.css"
 import Header from "./components/Header"
 import ToastContainer from "./components/ToastContainer"
@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Volunteer Connect",
+  title: "Volunteer Hub",
   description: "Coordinate volunteer shifts with ease",
   manifest: "/manifest.json",
   themeColor: "#8B5CF6",

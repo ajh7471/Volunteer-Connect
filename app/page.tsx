@@ -52,7 +52,7 @@ export default function HomePage() {
           <Info className="h-4 w-4 text-primary" />
           <AlertDescription className="ml-2">
             <span className="text-sm">
-              New to Volunteer Connect?{" "}
+              New to Volunteer Hub?{" "}
               <Link href="/about" className="font-medium text-primary underline hover:text-primary/80">
                 Learn more about our platform
               </Link>

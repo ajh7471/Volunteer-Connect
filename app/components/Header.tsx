@@ -45,7 +45,7 @@ export default function Header() {
 
       if (typeof window !== 'undefined') {
         try {
-          localStorage.removeItem('volunteer-connect-cache')
+          localStorage.removeItem('volunteer-hub-cache')
           sessionStorage.clear()
         } catch (storageError) {
           console.error('Storage cleanup error:', storageError)
@@ -70,7 +70,7 @@ export default function Header() {
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="text-xl font-bold text-foreground">
-            Volunteer Connect
+            Volunteer Hub
           </Link>
 
           {/* Desktop Navigation */}
