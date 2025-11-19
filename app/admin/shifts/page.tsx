@@ -70,7 +70,7 @@ export default function AdminShiftsPage() {
       setShifts(sorted)
 
       // Parallelize fetching assignments and volunteers
-      const shiftIds = sorted.map((s) => s.id)
+      const shiftIds = sorted.map((s: Shift) => s.id)
       
       const [assignResult, volResult] = await Promise.all([
         shiftIds.length > 0 
