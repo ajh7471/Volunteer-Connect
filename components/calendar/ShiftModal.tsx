@@ -22,7 +22,7 @@ type ShiftModalProps = {
   userId: string | null
   isAssigned: boolean
   isSigningUp: boolean
-  attendees: Array<{ name: string; id: string }> | undefined
+  attendees: Array<{ name: string | null; id: string }> | undefined
   isLoadingAttendees: boolean
   onSignUp: (shiftId: string) => void
   onCancel: (shiftId: string) => void
@@ -123,10 +123,10 @@ export function ShiftModal({
                     {attendees.map((attendee) => (
                       <div key={attendee.id} className="flex items-center gap-3 text-sm">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-xs">
-                          {attendee.name.charAt(0).toUpperCase()}
+                          {(attendee.name || "Unknown").charAt(0).toUpperCase()}
                         </div>
                         <span className={attendee.id === userId ? "font-semibold" : ""}>
-                          {attendee.name} {attendee.id === userId && "(You)"}
+                          {attendee.name || "Unknown"} {attendee.id === userId && "(You)"}
                         </span>
                       </div>
                     ))}
