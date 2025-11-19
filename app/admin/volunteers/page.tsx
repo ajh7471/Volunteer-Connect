@@ -68,7 +68,7 @@ export default function VolunteersPage() {
       new Date(v.created_at).toLocaleDateString(),
     ])
 
-    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n")
+    const csv = [headers, ...rows].map((row: (string | number)[]) => row.join(",")).join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
