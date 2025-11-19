@@ -49,8 +49,6 @@ export default function VolunteerDashboard() {
     const startOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
     const endOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0))
 
-    console.log("[v0] Dashboard date range:", { today, startOfMonth, endOfMonth })
-
     const { data: assignments, error } = await supabase
       .from("shift_assignments")
       .select(
@@ -67,9 +65,6 @@ export default function VolunteerDashboard() {
       )
       .eq("user_id", userId)
 
-    console.log("[v0] Raw assignments from database:", assignments)
-    console.log("[v0] Query error (if any):", error)
-
     let completedCount = 0
     let totalHours = 0
     const upcoming: UpcomingShift[] = []
@@ -77,19 +72,10 @@ export default function VolunteerDashboard() {
     if (assignments && assignments.length > 0) {
       assignments.forEach((assignment: any) => {
         if (!assignment.shifts) {
-          console.log("[v0] Skipping assignment with null shift:", assignment.id)
           return
         }
 
         const shiftDate = assignment.shifts.shift_date
-
-        console.log("[v0] Processing assignment:", {
-          id: assignment.id,
-          shift_date: shiftDate,
-          comparison: shiftDate >= today,
-          isUpcoming: shiftDate >= today,
-          isPast: shiftDate < today,
-        })
 
         if (shiftDate < today) {
           completedCount++
@@ -114,17 +100,7 @@ export default function VolunteerDashboard() {
 
       upcoming.sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
-      console.log("[v0] All upcoming shifts:", upcoming)
-
       const thisMonth = upcoming.filter((s) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth)
-      
-      console.log("[v0] This month's shifts:", thisMonth)
-      console.log("[v0] Filter logic:", {
-        startOfMonth,
-        endOfMonth,
-        exampleShift: upcoming[0],
-        passesFilter: upcoming[0] ? (upcoming[0].shift_date >= startOfMonth && upcoming[0].shift_date <= endOfMonth) : 'no shifts',
-      })
 
       setUpcomingShifts(upcoming.slice(0, 3))
 
