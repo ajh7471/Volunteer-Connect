@@ -28,7 +28,7 @@ export default function CalendarPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [userAssignments, setUserAssignments] = useState<Set<string>>(new Set())
   const [signingUpShifts, setSigningUpShifts] = useState<Set<string>>(new Set())
-  const [shiftAttendees, setShiftAttendees] = useState<Record<string, Array<{ name: string; id: string }>>>({})
+  const [shiftAttendees, setShiftAttendees] = useState<Record<string, Array<{ name: string | null; id: string }>>>({})
   const [loadingAttendees, setLoadingAttendees] = useState<Set<string>>(new Set())
 
   useEffect(() => {
