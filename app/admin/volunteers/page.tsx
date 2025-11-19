@@ -9,17 +9,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Download, AlertCircle, RefreshCw } from 'lucide-react'
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getAllVolunteers, syncMissingProfiles, type VolunteerData } from "./volunteers-actions"
+import { Search, Download } from 'lucide-react'
+import { getAdminUsers } from "@/app/admin/actions"
+
+type VolunteerData = {
+  id: string
+  name: string | null
+  email: string | null
+  phone: string | null
+  role: string | null
+  active: boolean | null
+  created_at: string
+  last_sign_in_at?: string
+}
 
 export default function VolunteersPage() {
   const [volunteers, setVolunteers] = useState<VolunteerData[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("active")
-  const [missingProfiles, setMissingProfiles] = useState<number>(0)
-  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     loadVolunteers()
@@ -29,34 +37,28 @@ export default function VolunteersPage() {
     setLoading(true)
 
     try {
-      const result = await getAllVolunteers(statusFilter)
-      setVolunteers(result.volunteers)
-      setMissingProfiles(result.missingProfiles)
+      const result = await getAdminUsers()
       
-      console.log("[v0] Client: Loaded volunteers:", result.volunteers.length)
-      console.log("[v0] Client: Volunteer emails:", result.volunteers.map(v => v.email || v.auth_email))
+      if (result.success && result.users) {
+        let filteredUsers = result.users
+        
+        // Apply status filter
+        if (statusFilter === "active") {
+          filteredUsers = filteredUsers.filter((u: VolunteerData) => u.active !== false)
+        } else if (statusFilter === "inactive") {
+          filteredUsers = filteredUsers.filter((u: VolunteerData) => u.active === false)
+        }
+        
+        setVolunteers(filteredUsers)
+        console.log("[v0] Client: Loaded volunteers:", filteredUsers.length)
+        console.log("[v0] Client: Volunteer emails:", filteredUsers.map((v: VolunteerData) => v.email))
+      } else {
+        console.error("[v0] Client: Failed to load volunteers:", result.error)
+      }
     } catch (err) {
       console.error("[v0] Client: Load volunteers error:", err)
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleSyncProfiles() {
-    setSyncing(true)
-
-    try {
-      const result = await syncMissingProfiles()
-      alert(result.message)
-
-      if (result.count > 0) {
-        await loadVolunteers()
-      }
-    } catch (err) {
-      console.error("[v0] Client: Sync error:", err)
-      alert(`Failed to sync profiles: ${err instanceof Error ? err.message : "Unknown error"}`)
-    } finally {
-      setSyncing(false)
     }
   }
 
@@ -66,21 +68,20 @@ export default function VolunteersPage() {
       (v.name || "").toLowerCase().includes(q) ||
       (v.phone || "").toLowerCase().includes(q) ||
       (v.email || "").toLowerCase().includes(q) ||
-      (v.auth_email || "").toLowerCase().includes(q) ||
       v.id.toLowerCase().includes(q)
     )
   })
 
   function exportToCSV() {
-    const headers = ["Name", "Email", "Phone", "Role", "Status", "Has Profile", "Joined"]
+    const headers = ["Name", "Email", "Phone", "Role", "Status", "Joined", "Last Sign In"]
     const rows = filtered.map((v: VolunteerData) => [
       v.name || "Unnamed",
-      v.email || v.auth_email || "",
+      v.email || "",
       v.phone || "",
       v.role || "volunteer",
       v.active === false ? "Inactive" : "Active",
-      v.has_profile ? "Yes" : "No",
       new Date(v.created_at).toLocaleDateString(),
+      v.last_sign_in_at ? new Date(v.last_sign_in_at).toLocaleDateString() : "Never",
     ])
 
     const csv = [headers, ...rows].map((row: (string | number)[]) => row.join(",")).join("\n")
@@ -111,26 +112,6 @@ export default function VolunteersPage() {
             </Button>
           </div>
         </div>
-
-        {missingProfiles > 0 && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>
-                Found {missingProfiles} user(s) without profiles. These users exist in authentication but don't have complete profile records.
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncProfiles}
-                disabled={syncing}
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Syncing..." : "Sync Profiles"}
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
 
         <Card>
           <CardHeader>
@@ -173,16 +154,16 @@ export default function VolunteersPage() {
                       <TableHead>Phone</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Profile</TableHead>
                       <TableHead>Joined</TableHead>
+                      <TableHead>Last Sign In</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filtered.map((v: VolunteerData) => (
-                      <TableRow key={v.id} className={!v.has_profile ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
+                      <TableRow key={v.id}>
                         <TableCell className="font-medium">{v.name || "Unnamed"}</TableCell>
-                        <TableCell>{v.email || v.auth_email || "No email"}</TableCell>
+                        <TableCell>{v.email || "No email"}</TableCell>
                         <TableCell>{v.phone || "No phone"}</TableCell>
                         <TableCell>
                           <Badge variant={v.role === "admin" ? "default" : "secondary"}>{v.role || "volunteer"}</Badge>
@@ -192,22 +173,12 @@ export default function VolunteersPage() {
                             {v.active === false ? "Inactive" : "Active"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant={v.has_profile ? "default" : "destructive"}>
-                            {v.has_profile ? "Complete" : "Missing"}
-                          </Badge>
-                        </TableCell>
                         <TableCell>{new Date(v.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{v.last_sign_in_at ? new Date(v.last_sign_in_at).toLocaleDateString() : "Never"}</TableCell>
                         <TableCell className="text-right">
-                          {v.has_profile ? (
-                            <Button asChild variant="outline" size="sm">
-                              <Link href={`/admin/volunteers/${v.id}`}>View</Link>
-                            </Button>
-                          ) : (
-                            <Button variant="outline" size="sm" disabled>
-                              No Profile
-                            </Button>
-                          )}
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/admin/volunteers/${v.id}`}>View</Link>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
