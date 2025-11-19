@@ -282,7 +282,76 @@ export async function sendBulkEmail(
   body: string,
   emailType: string
 ) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) throw new Error("Unauthorized")
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+
+  if (!profile || profile.role !== "admin") {
+    throw new Error("Unauthorized: Admin access required")
+  }
+
+  // Get recipient details
+  const { data: recipients } = await supabase
+    .from("profiles")
+    .select("id, email_opt_in")
+    .in("id", recipientIds)
+
+  if (!recipients) throw new Error("No recipients found")
+
+  // Filter only opted-in recipients
+  const optedInRecipients = recipients.filter((r) => r.email_opt_in)
+
+  if (optedInRecipients.length === 0) {
+    throw new Error("No opted-in recipients found")
+  }
+
+  // Get emails from auth system
+  const emailPromises = optedInRecipients.map(async (recipient) => {
+    const { data: authUser } = await supabase.auth.admin.getUserById(recipient.id)
+
+    if (!authUser.user?.email) return null
+
+    // Log email (simulated sending)
+    const { error } = await supabase.from("email_logs").insert({
+      sent_by: user.id,
+      recipient_id: recipient.id,
+      recipient_email: authUser.user.email,
+      email_type: emailType,
+      subject: subject,
+      status: "sent", // In production, this would be 'pending' then updated by email service
+    })
+
+    if (error) throw error
+    return authUser.user.email
+  })
+
+  const sentEmails = (await Promise.all(emailPromises)).filter((email) => email !== null)
+
+  revalidatePath("/admin/emails")
+
+  return {
+    success: true,
+    count: sentEmails.length,
+    message: `Email sent to ${sentEmails.length} recipient(s)`,
+  }
+}
+
+/**
+ * Send individual emails to multiple recipients
+ */
+export async function sendIndividualEmails(
+  recipientIds: string[],
+  subject: string,
+  body: string,
+  emailType: string
+) {
+  const supabase = await createClient()
 
   const {
     data: { user },
