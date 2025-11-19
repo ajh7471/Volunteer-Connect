@@ -145,6 +145,9 @@ export default function HomePage() {
                 </p>
               </div>
             </form>
+            <div className="mt-4 text-left">
+              <p className="text-xs text-muted-foreground">v1.4.1</p>
+            </div>
           </CardContent>
         </Card>
       </div>
