@@ -65,7 +65,7 @@ export default function AdminShiftsPage() {
 
     if (shiftsData) {
       const sorted = shiftsData.sort(
-        (a, b) => SLOT_ORDER[a.slot as keyof typeof SLOT_ORDER] - SLOT_ORDER[b.slot as keyof typeof SLOT_ORDER],
+        (a: Shift, b: Shift) => SLOT_ORDER[a.slot as keyof typeof SLOT_ORDER] - SLOT_ORDER[b.slot as keyof typeof SLOT_ORDER],
       )
       setShifts(sorted)
 
