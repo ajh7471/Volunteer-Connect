@@ -298,25 +298,29 @@ export default function MySchedulePage() {
       .neq("user_id", userId!)
 
     interface AssignmentWithProfile {
-      user_id: string;
+      user_id: string
       profiles: {
-        id: string;
-        name: string;
-        email: string;
-        phone: string | null;
-      } | null;
+        id: string
+        name: string
+        email: string
+        phone: string | null
+      } | null
     }
 
     const teamMembers =
       !error && data
         ? (data as AssignmentWithProfile[])
-            .filter((a: AssignmentWithProfile) => a.profiles !== null)
-            .map((a: AssignmentWithProfile) => ({
-              id: a.profiles!.id,
-              name: a.profiles!.name || "Anonymous",
-              email: a.profiles!.email || "",
-              phone: a.profiles!.phone || null,
-            }))
+            .map((a: AssignmentWithProfile) => {
+              // Improved safety check for profiles relation and filtering
+              if (!a.profiles) return null
+              return {
+                id: a.profiles.id,
+                name: a.profiles.name || "Anonymous",
+                email: a.profiles.email || "",
+                phone: a.profiles.phone || null,
+              }
+            })
+            .filter((item): item is TeamMember => item !== null)
         : []
 
     setShiftTeamMembers((prev) => ({

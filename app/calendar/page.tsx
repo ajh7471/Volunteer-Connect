@@ -113,14 +113,22 @@ export default function CalendarPage() {
       )
       .eq("shift_id", shiftId)
 
+    if (error) {
+      console.error("[v0] Error loading shift attendees:", error)
+    }
+
     const attendeesList =
       !error && data
         ? (data as AssignmentWithRelations[])
-            .filter((a: AssignmentWithRelations) => a.profiles?.name)
-            .map((a: AssignmentWithRelations) => ({
-              name: a.profiles?.name || 'Unknown',
-              id: a.profiles?.id || '',
-            }))
+            .map((a: AssignmentWithRelations) => {
+              // Improved safety check for profiles relation and filtering
+              if (!a.profiles) return null
+              return {
+                name: a.profiles.name || "Unknown",
+                id: a.profiles.id || "",
+              }
+            })
+            .filter((item): item is { name: string; id: string } => item !== null)
         : []
 
     setShiftAttendees((prev) => ({
