@@ -30,25 +30,21 @@ interface EmailServiceConfig {
   updated_at?: string
 }
 
-type SendGridConfig = {
-  id: string
+type SendGridConfig = EmailServiceConfig & {
+  service_name: "sendgrid"
   sendgrid_api_key: string
   sendgrid_from_email: string
   sendgrid_from_name: string
-  is_active: boolean
   is_validated: boolean
-  validation_error: string | null
 }
 
-type GmailConfig = {
-  id: string
+type GmailConfig = EmailServiceConfig & {
+  service_name: "gmail"
   gmail_client_id: string
   gmail_client_secret: string
   gmail_refresh_token: string
   gmail_from_email: string
-  is_active: boolean
   is_validated: boolean
-  validation_error: string | null
 }
 
 function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[] }) {
