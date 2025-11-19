@@ -89,7 +89,7 @@ export async function cleanupTestVolunteers() {
 }
 
 // Test assertion helpers
-export function assertEquals(actual: any, expected: any, message?: string) {
+export function assertEquals<T>(actual: T, expected: T, message?: string): void {
   if (actual !== expected) {
     throw new Error(`Assertion failed: ${message || ""}\nExpected: ${expected}\nActual: ${actual}`)
   }

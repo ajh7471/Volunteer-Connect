@@ -48,6 +48,14 @@ type Profile = {
   email?: string
 }
 
+type EmailInsertResult = {
+  error: any
+  data: any
+  count: null
+  status: number
+  statusText: string
+}
+
 export default function AdminEmailsPage() {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([])
@@ -137,8 +145,7 @@ export default function AdminEmailsPage() {
     try {
       const { data: authUser } = await supabase.auth.getUser()
 
-      // Log email for each recipient
-      const emailPromises: Promise<any>[] = selectedRecipients.map(async (recipientId: string) => {
+      const emailPromises: Promise<EmailInsertResult>[] = selectedRecipients.map(async (recipientId: string) => {
         const volunteer = volunteers.find((v: Volunteer) => v.id === recipientId)
 
         return supabase.from("email_logs").insert({
