@@ -21,6 +21,7 @@ interface EmailServiceConfig {
   gmail_client_secret?: string
   gmail_refresh_token?: string
   gmail_from_email?: string
+  validation_error?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -62,6 +63,12 @@ function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[]
                 )}
                 {sendgridConfig.is_active && <Badge variant="outline">Active</Badge>}
                 <Badge variant="secondary">Priority: {sendgridConfig.priority}</Badge>
+                {sendgridConfig.validation_error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{sendgridConfig.validation_error}</AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           )}
@@ -90,6 +97,12 @@ function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[]
                 )}
                 {gmailConfig.is_active && <Badge variant="outline">Active</Badge>}
                 <Badge variant="secondary">Priority: {gmailConfig.priority}</Badge>
+                {gmailConfig.validation_error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{gmailConfig.validation_error}</AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           )}
