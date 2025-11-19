@@ -284,7 +284,7 @@ export default function AdminShiftsPage() {
 
         {/* Shifts List */}
         {!loading &&
-          shifts.map((shift) => {
+          shifts.map((shift: Shift) => {
             const currentAssignments = assignments[shift.id] || []
             const availableSlots = shift.capacity - currentAssignments.length
 
@@ -312,7 +312,7 @@ export default function AdminShiftsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n: number) => (
                             <SelectItem key={n} value={String(n)}>
                               {n}
                             </SelectItem>
@@ -331,7 +331,7 @@ export default function AdminShiftsPage() {
                     <div className="mb-4 space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Assigned Volunteers:</p>
                       <div className="space-y-2">
-                        {currentAssignments.map((assignment) => (
+                        {currentAssignments.map((assignment: Assignment) => (
                           <div
                             key={assignment.id}
                             className="flex items-center justify-between rounded-lg border bg-card p-3"
@@ -363,8 +363,8 @@ export default function AdminShiftsPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {volunteers
-                            .filter((v) => !currentAssignments.some((a) => a.user_id === v.id))
-                            .map((volunteer) => (
+                            .filter((v: Volunteer) => !currentAssignments.some((a: Assignment) => a.user_id === v.id))
+                            .map((volunteer: Volunteer) => (
                               <SelectItem key={volunteer.id} value={volunteer.id}>
                                 {volunteer.name || "Unnamed"} {volunteer.phone ? `(${volunteer.phone})` : ""}
                               </SelectItem>

@@ -93,7 +93,7 @@ export default function AdminUsersPage() {
   async function loadBlockedEmails() {
     const { data } = await supabase.from("auth_blocklist").select("email")
     if (data) {
-      setBlockedEmails(data.map((row) => row.email))
+      setBlockedEmails(data.map((row: { email: string }) => row.email))
     }
   }
 
