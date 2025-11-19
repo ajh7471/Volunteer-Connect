@@ -56,7 +56,6 @@ export default function AdminShiftsPage() {
   async function loadData() {
     setLoading(true)
 
-    // Load shifts for selected date
     const { data: shiftsData } = await supabase
       .from("shifts")
       .select("*")
@@ -69,7 +68,6 @@ export default function AdminShiftsPage() {
       )
       setShifts(sorted)
 
-      // Parallelize fetching assignments and volunteers
       const shiftIds = sorted.map((s: Shift) => s.id)
       
       const [assignResult, volResult] = await Promise.all([
@@ -86,7 +84,6 @@ export default function AdminShiftsPage() {
           .order("name", { ascending: true })
       ])
 
-      // Process assignments
       if (assignResult.data) {
         const grouped: Record<string, Assignment[]> = {}
         assignResult.data.forEach((a: Assignment) => {
@@ -98,22 +95,12 @@ export default function AdminShiftsPage() {
         setAssignments({})
       }
 
-      // Process volunteers
       if (volResult.data) {
         setVolunteers(volResult.data as Volunteer[])
       }
     } else {
-      // Even if no shifts, we might want to load volunteers? 
-      // Probably not needed if no shifts to assign to.
       setShifts([])
       setAssignments({})
-      
-      // Still load volunteers in case they want to seed and then assign immediately?
-      // The original code loaded volunteers regardless of shifts existence (it was outside the if(shiftsData) block? No, it was after.)
-      // Wait, original code:
-      // if (shiftsData) { ... }
-      // const { data: volData } = await supabase...
-      // So volunteers were loaded even if no shifts.
       
       const { data: volData } = await supabase
         .from("profiles")
@@ -160,7 +147,6 @@ export default function AdminShiftsPage() {
       return
     }
 
-    // Check if volunteer already assigned
     if (currentAssignments.some((a) => a.user_id === userId)) {
       toast.error("This volunteer is already assigned to this shift")
       return
@@ -213,7 +199,6 @@ export default function AdminShiftsPage() {
   return (
     <RequireAuth>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Manage Shifts</h1>
@@ -224,7 +209,6 @@ export default function AdminShiftsPage() {
           </Button>
         </div>
 
-        {/* Date Picker */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -258,7 +242,6 @@ export default function AdminShiftsPage() {
           </CardContent>
         </Card>
 
-        {/* Loading State */}
         {loading && (
           <Card>
             <CardContent className="py-8">
@@ -267,7 +250,6 @@ export default function AdminShiftsPage() {
           </Card>
         )}
 
-        {/* No Shifts Warning */}
         {!loading && shifts.length === 0 && (
           <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
             <CardContent className="flex items-center gap-3 py-6">
@@ -282,7 +264,6 @@ export default function AdminShiftsPage() {
           </Card>
         )}
 
-        {/* Shifts List */}
         {!loading &&
           shifts.map((shift: Shift) => {
             const currentAssignments = assignments[shift.id] || []
@@ -326,7 +307,6 @@ export default function AdminShiftsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Assigned Volunteers */}
                   {currentAssignments.length > 0 && (
                     <div className="mb-4 space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Assigned Volunteers:</p>
@@ -353,7 +333,6 @@ export default function AdminShiftsPage() {
                     </div>
                   )}
 
-                  {/* Add Volunteer */}
                   {availableSlots > 0 && (
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <UserPlus className="h-4 w-4 text-muted-foreground" />
