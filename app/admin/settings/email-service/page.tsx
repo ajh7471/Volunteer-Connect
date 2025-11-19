@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getEmailServiceConfigs } from "@/app/admin/email-service-actions"
 import { CheckCircle2, XCircle, AlertCircle, Mail, Settings } from 'lucide-react'
 
 interface EmailServiceConfig {
