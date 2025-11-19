@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, User, Lock, Bell, Calendar, Download } from "lucide-react"
+import { Loader2, User, Lock, Bell, Calendar, Download } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
 
@@ -35,6 +35,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [email, setEmail] = useState("")
 
   // Form fields
   const [name, setName] = useState("")
@@ -58,6 +59,8 @@ export default function ProfilePage() {
       router.push("/auth/login")
       return
     }
+
+    setEmail(userData.user.email || "")
 
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userData.user.id).single()
 
@@ -202,7 +205,7 @@ export default function ProfilePage() {
 
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input value={profile?.id || ""} disabled className="bg-muted" />
+                  <Input value={email} disabled className="bg-muted" />
                   <p className="text-xs text-muted-foreground">Email cannot be changed. Contact admin if needed.</p>
                 </div>
 

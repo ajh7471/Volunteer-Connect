@@ -3,15 +3,40 @@ import { getCapacityStatus } from "@/lib/shifts"
 
 type ShiftIndicatorProps = {
   slot: "AM" | "MID" | "PM"
+  startTime: string
+  endTime: string
   capacity: number
   assignmentsCount: number
+  isAssigned?: boolean
   onClick?: () => void
 }
 
-export function ShiftIndicator({ slot, capacity, assignmentsCount, onClick }: ShiftIndicatorProps) {
-  const status = getCapacityStatus(capacity, assignmentsCount)
+export function ShiftIndicator({
+  slot,
+  startTime,
+  endTime,
+  capacity,
+  assignmentsCount,
+  isAssigned = false,
+  onClick,
+}: ShiftIndicatorProps) {
+  const capacityStatus = getCapacityStatus(capacity, assignmentsCount)
+  const status = isAssigned ? "registered" : capacityStatus
+
+  // Format time to be more readable (e.g., "09:00:00" -> "9am")
+  const formatTime = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(":").map(Number)
+    const period = hours >= 12 ? "PM" : "AM"
+    const displayHours = hours % 12 || 12
+    // If minutes is 0, don't show it to save space in the small indicator
+    const displayMinutes = minutes > 0 ? `:${minutes.toString().padStart(2, "0")}` : ""
+    return `${displayHours}${displayMinutes}${period}`
+  }
+
+  const timeLabel = `${formatTime(startTime)}-${formatTime(endTime)}`
 
   const statusColors = {
+    registered: "bg-blue-600 hover:bg-blue-700",
     available: "bg-green-500 hover:bg-green-600",
     "nearly-full": "bg-orange-500 hover:bg-orange-600",
     full: "bg-red-500 hover:bg-red-600",
@@ -19,22 +44,30 @@ export function ShiftIndicator({ slot, capacity, assignmentsCount, onClick }: Sh
   }
 
   const statusLabels = {
+    registered: "Registered",
     available: "Available",
     "nearly-full": "Nearly Full",
     full: "Full",
-    none: "No Shift",
+    none: "Not Available",
+  }
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (onClick) {
+      e.stopPropagation()
+      onClick()
+    }
   }
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={`${statusColors[status]} group relative flex h-6 w-full items-center justify-center rounded text-xs font-medium text-white transition-colors`}
-      title={`${slot}: ${assignmentsCount}/${capacity} - ${statusLabels[status]}`}
+      title={`${timeLabel}: ${assignmentsCount}/${capacity} - ${statusLabels[status]}`}
     >
-      <span className="hidden sm:inline">{slot}</span>
+      <span className="hidden sm:inline">{timeLabel}</span>
       <span className="sm:hidden">•</span>
       <span className="absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white group-hover:block">
-        {slot}: {assignmentsCount}/{capacity}
+        {timeLabel}: {assignmentsCount}/{capacity}
       </span>
     </button>
   )

@@ -226,12 +226,20 @@ export async function leaveWaitlist(waitlistId: string) {
 
   if (error) return { success: false, error: error.message }
 
-  // Update positions for remaining waitlist
-  await supabase
+  const { data: affectedEntries } = await supabase
     .from("shift_waitlist")
-    .update({ position: supabase.raw("position - 1") })
+    .select("id, position")
     .eq("shift_id", entry.shift_id)
     .gt("position", entry.position)
+
+  if (affectedEntries && affectedEntries.length > 0) {
+    for (const waitlistEntry of affectedEntries) {
+      await supabase
+        .from("shift_waitlist")
+        .update({ position: waitlistEntry.position - 1 })
+        .eq("id", waitlistEntry.id)
+    }
+  }
 
   revalidatePath("/calendar")
   revalidatePath("/my-schedule")
@@ -289,208 +297,6 @@ export async function acceptWaitlistSpot(waitlistId: string) {
   await supabase.rpc("process_waitlist", { shift_id_param: entry.shift_id })
 
   revalidatePath("/calendar")
-  revalidatePath("/my-schedule")
-  return { success: true }
-}
-
-// ============================================
-// 3. SHIFT SWAPPING
-// ============================================
-
-/**
- * Request a shift swap
- * Test Coverage: SSW-3.1
- */
-export async function requestShiftSwap(assignmentId: string, targetUserId: string | null, message?: string) {
-  const supabase = await createServerClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: "Not authenticated" }
-
-  // Verify assignment belongs to requesting user
-  const { data: assignment } = await supabase
-    .from("shift_assignments")
-    .select("*, shifts(*)")
-    .eq("id", assignmentId)
-    .single()
-
-  if (!assignment || assignment.user_id !== user.id) {
-    return { success: false, error: "Assignment not found or not yours" }
-  }
-
-  // Create swap request
-  const { data, error } = await supabase
-    .from("shift_swap_requests")
-    .insert({
-      original_assignment_id: assignmentId,
-      requesting_user_id: user.id,
-      target_user_id: targetUserId,
-      shift_id: assignment.shift_id,
-      message,
-    })
-    .select()
-    .single()
-
-  if (error) return { success: false, error: error.message }
-
-  // Notify target user if specified
-  if (targetUserId) {
-    await supabase.from("notification_queue").insert({
-      user_id: targetUserId,
-      shift_id: assignment.shift_id,
-      notification_type: "shift_swap_request",
-      subject: "Shift Swap Request",
-      body: `A volunteer has requested to swap a shift with you. ${message || ""}`,
-      scheduled_for: new Date().toISOString(),
-    })
-  }
-
-  revalidatePath("/my-schedule")
-  return { success: true, data }
-}
-
-/**
- * Accept shift swap
- * Test Coverage: SSW-3.2
- */
-export async function acceptShiftSwap(swapRequestId: string) {
-  const supabase = await createServerClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: "Not authenticated" }
-
-  // Get swap request
-  const { data: swapRequest } = await supabase.from("shift_swap_requests").select("*").eq("id", swapRequestId).single()
-
-  if (!swapRequest || (swapRequest.target_user_id && swapRequest.target_user_id !== user.id)) {
-    return { success: false, error: "Swap request not found or not for you" }
-  }
-
-  // Update swap request
-  const { error } = await supabase
-    .from("shift_swap_requests")
-    .update({
-      status: "accepted",
-      target_user_id: user.id, // Set target if it was open
-      responded_at: new Date().toISOString(),
-    })
-    .eq("id", swapRequestId)
-
-  if (error) return { success: false, error: error.message }
-
-  // Notify requesting user and admin
-  await supabase.from("notification_queue").insert([
-    {
-      user_id: swapRequest.requesting_user_id,
-      shift_id: swapRequest.shift_id,
-      notification_type: "shift_swap_accepted",
-      subject: "Shift Swap Accepted",
-      body: "Your shift swap request has been accepted. Pending admin approval.",
-      scheduled_for: new Date().toISOString(),
-    },
-  ])
-
-  revalidatePath("/my-schedule")
-  revalidatePath("/admin/swap-requests")
-  return { success: true }
-}
-
-/**
- * Admin approve shift swap
- * Test Coverage: SSW-3.3
- */
-export async function adminApproveSwap(swapRequestId: string) {
-  const supabase = await createServerClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: "Not authenticated" }
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
-  if (profile?.role !== "admin") {
-    return { success: false, error: "Admin access required" }
-  }
-
-  // Get swap request
-  const { data: swapRequest } = await supabase.from("shift_swap_requests").select("*").eq("id", swapRequestId).single()
-
-  if (!swapRequest || swapRequest.status !== "accepted") {
-    return { success: false, error: "Invalid swap request" }
-  }
-
-  // Update original assignment
-  const { error: updateError } = await supabase
-    .from("shift_assignments")
-    .update({ user_id: swapRequest.target_user_id })
-    .eq("id", swapRequest.original_assignment_id)
-
-  if (updateError) return { success: false, error: updateError.message }
-
-  // Update swap request
-  await supabase
-    .from("shift_swap_requests")
-    .update({
-      status: "completed",
-      admin_approved: true,
-      admin_approved_by: user.id,
-      admin_approved_at: new Date().toISOString(),
-    })
-    .eq("id", swapRequestId)
-
-  // Notify both users
-  await supabase.from("notification_queue").insert([
-    {
-      user_id: swapRequest.requesting_user_id,
-      shift_id: swapRequest.shift_id,
-      notification_type: "shift_swap_completed",
-      subject: "Shift Swap Approved",
-      body: "Your shift swap has been approved by admin.",
-      scheduled_for: new Date().toISOString(),
-    },
-    {
-      user_id: swapRequest.target_user_id,
-      shift_id: swapRequest.shift_id,
-      notification_type: "shift_swap_completed",
-      subject: "Shift Swap Completed",
-      body: "The shift swap has been completed.",
-      scheduled_for: new Date().toISOString(),
-    },
-  ])
-
-  revalidatePath("/admin/swap-requests")
-  revalidatePath("/my-schedule")
-  return { success: true }
-}
-
-/**
- * Decline shift swap
- * Test Coverage: SSW-3.4
- */
-export async function declineShiftSwap(swapRequestId: string) {
-  const supabase = await createServerClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: "Not authenticated" }
-
-  const { error } = await supabase
-    .from("shift_swap_requests")
-    .update({
-      status: "declined",
-      responded_at: new Date().toISOString(),
-    })
-    .eq("id", swapRequestId)
-    .eq("target_user_id", user.id)
-
-  if (error) return { success: false, error: error.message }
-
   revalidatePath("/my-schedule")
   return { success: true }
 }

@@ -1,122 +1,121 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import type React from "react"
+import { useState } from "react"
+import { useRouter } from 'next/navigation'
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, Clock, Users, Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle, Info } from 'lucide-react'
 
 export default function HomePage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [role, setRole] = useState<string | null>(null)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    checkAuthAndRedirect()
-  }, [])
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
 
-  async function checkAuthAndRedirect() {
-    const { data } = await supabase.auth.getUser()
-    const uid = data.user?.id
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (uid) {
-      // Get user role
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", uid).single()
-
-      if (profile) {
-        setUserId(uid)
-        setRole(profile.role)
-
-        if (profile.role === "admin") {
-          router.push("/admin")
-        } else {
-          router.push("/volunteer")
-        }
-        return
+    if (authError) {
+      if (authError.message.includes("Invalid login credentials") || authError.message.includes("invalid")) {
+        setError("The password you entered is incorrect. Please check your credentials and try again.")
+      } else if (authError.message.includes("Email not confirmed")) {
+        setError("Please verify your email address before logging in. Check your inbox for a confirmation link.")
+      } else {
+        setError("Unable to sign in. Please check your email and password and try again.")
       }
+      setLoading(false)
+    } else if (data.user) {
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
+
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+      window.location.href = destination
     }
-
-    setLoading(false)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
   }
 
   return (
-    <div className="space-y-12 py-12">
-      {/* Hero Section */}
-      <section className="text-center">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl xl:text-7xl">
-          Welcome to <span className="text-primary">Volunteer Connect</span>
-        </h1>
-        <p className="mx-auto mb-8 max-w-2xl text-balance text-lg text-muted-foreground sm:text-xl">
-          Coordinate volunteer shifts with ease. Sign up for shifts, view your schedule, and help make a difference.
-        </p>
-        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Button asChild size="lg" className="w-full sm:w-auto">
-            <Link href="/auth/signup">Get Started</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg" className="w-full sm:w-auto bg-transparent">
-            <Link href="/auth/login">Login</Link>
-          </Button>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <Card className="transition-shadow hover:shadow-lg">
-          <CardHeader>
-            <Calendar className="mb-2 h-12 w-12 text-primary" />
-            <CardTitle className="text-2xl">Easy Scheduling</CardTitle>
+    <div className="flex min-h-[calc(100vh-200px)] items-center justify-center py-12">
+      <div className="w-full max-w-md space-y-6">
+        <Card className="w-full">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+            <CardDescription>Sign in to access your volunteer dashboard</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              View available shifts in a monthly calendar and sign up with one click
-            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive" className="border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="ml-2">
+                    <p className="font-medium mb-1">{error}</p>
+                    {error.includes("password") && (
+                      <p className="text-sm mt-2">
+                        Need help?{" "}
+                        <Link href="/auth/forgot" className="font-medium underline hover:text-red-800">
+                          Reset your password
+                        </Link>
+                      </p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Signing in..." : "Sign In"}
+              </Button>
+
+              <div className="space-y-2 text-center text-sm">
+                <Link href="/auth/forgot" className="text-primary hover:underline">
+                  Forgot password?
+                </Link>
+                <p className="text-muted-foreground">
+                  Don't have an account?{" "}
+                  <Link href="/auth/signup" className="text-primary hover:underline">
+                    Sign up
+                  </Link>
+                </p>
+              </div>
+            </form>
           </CardContent>
         </Card>
-
-        <Card className="transition-shadow hover:shadow-lg">
-          <CardHeader>
-            <Clock className="mb-2 h-12 w-12 text-primary" />
-            <CardTitle className="text-2xl">Track Your Hours</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              See all your upcoming shifts in one place and manage your volunteer schedule
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-shadow hover:shadow-lg">
-          <CardHeader>
-            <Users className="mb-2 h-12 w-12 text-primary" />
-            <CardTitle className="text-2xl">Team Coordination</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">See who else is volunteering and coordinate with your team members</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* CTA Section */}
-      <section className="rounded-2xl bg-accent p-8 text-center sm:p-12">
-        <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">Ready to get started?</h2>
-        <p className="mx-auto mb-6 max-w-2xl text-lg text-muted-foreground">
-          Create an account to start signing up for volunteer shifts
-        </p>
-        <Button asChild size="lg">
-          <Link href="/auth/signup">Sign Up Now</Link>
-        </Button>
-      </section>
+      </div>
     </div>
   )
 }

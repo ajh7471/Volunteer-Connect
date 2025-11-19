@@ -12,6 +12,7 @@
 
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
+import { Role } from "@/types/database"
 
 /**
  * Creates a Supabase client with service role privileges
@@ -167,7 +168,7 @@ export async function deleteUserAccount(userId: string) {
     data: { user: currentUser },
   } = await userClient.auth.getUser()
 
-  if (currentUser?.id === userId) {
+  if (currentUser && currentUser.id === userId) {
     return { success: false, error: "Cannot delete your own account" }
   }
 
@@ -175,7 +176,7 @@ export async function deleteUserAccount(userId: string) {
 
   const { data: userToDelete } = await supabase.from("profiles").select("role").eq("id", userId).single()
 
-  if (userToDelete?.role === "admin" && admins && admins.length <= 1) {
+  if (userToDelete && userToDelete.role === "admin" && admins && admins.length <= 1) {
     return { success: false, error: "Cannot delete the last admin account" }
   }
 
@@ -207,7 +208,7 @@ export async function deleteUserAccount(userId: string) {
  * @param newRole The new role to assign
  * @returns Success status or error message
  */
-export async function updateUserRole(userId: string, newRole: "volunteer" | "admin") {
+export async function updateUserRole(userId: string, newRole: Role) {
   const { isAdmin, error: authError } = await verifyAdminRole()
   if (!isAdmin) {
     return { success: false, error: authError || "Unauthorized" }
@@ -217,11 +218,10 @@ export async function updateUserRole(userId: string, newRole: "volunteer" | "adm
 
   const { data: currentProfile } = await supabase.from("profiles").select("role").eq("id", userId).single()
 
-  if (currentProfile?.role === "admin" && newRole === "volunteer") {
+  if (currentProfile && currentProfile.role === "admin" && newRole === "volunteer") {
     const { data: admins } = await supabase.from("profiles").select("id").eq("role", "admin")
-
     if (admins && admins.length <= 1) {
-      return { success: false, error: "Cannot demote the last admin account" }
+      return { success: false, error: "Cannot change role: You are the last admin" }
     }
   }
 
@@ -346,4 +346,57 @@ export async function bulkAssignShifts(userId: string, shiftIds: string[]) {
     failed: failedAssignments.length,
     errors: failedAssignments,
   }
+}
+
+/**
+ * GET ALL USERS WITH PROFILES
+ *
+ * Fetches all users from Supabase Auth and joins with their profile data.
+ * This replaces the inefficient client-side N+1 fetching pattern.
+ *
+ * @test-scope: User management - efficient data fetching
+ * @returns Array of user objects with profile data
+ */
+export async function getAdminUsers() {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) {
+    return { success: false, error: authError || "Unauthorized" }
+  }
+
+  const supabase = await getServiceRoleClient()
+
+  // Fetch profiles first
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: false })
+
+  if (profileError) {
+    return { success: false, error: "Failed to fetch profiles" }
+  }
+
+  // Fetch all auth users
+  // Note: listUsers defaults to 50 users per page. For larger apps, we'd need pagination.
+  const {
+    data: { users: authUsers },
+    error: authUserError,
+  } = await supabase.auth.admin.listUsers({
+    perPage: 1000, // Fetch up to 1000 users for now
+  })
+
+  if (authUserError) {
+    return { success: false, error: "Failed to fetch auth users" }
+  }
+
+  // Map auth data to profiles
+  const enrichedUsers = profiles.map((profile) => {
+    const authUser = authUsers.find((u) => u.id === profile.id)
+    return {
+      ...profile,
+      email: authUser?.email || "No email",
+      last_sign_in_at: authUser?.last_sign_in_at,
+    }
+  })
+
+  return { success: true, users: enrichedUsers }
 }

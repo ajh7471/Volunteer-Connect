@@ -5,12 +5,14 @@ import type { ShiftWithCapacity } from "@/lib/shifts"
 type MonthlyGridProps = {
   currentMonth: Date
   shifts: ShiftWithCapacity[]
+  userAssignments: Set<string>
   onDayClick: (date: Date) => void
+  onShiftClick?: (shift: ShiftWithCapacity) => void
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-export function MonthlyGrid({ currentMonth, shifts, onDayClick }: MonthlyGridProps) {
+export function MonthlyGrid({ currentMonth, shifts, userAssignments, onDayClick, onShiftClick }: MonthlyGridProps) {
   const days = daysInGrid(currentMonth)
 
   return (
@@ -27,7 +29,15 @@ export function MonthlyGrid({ currentMonth, shifts, onDayClick }: MonthlyGridPro
       {/* Calendar grid */}
       <div className="grid grid-cols-7">
         {days.map((date, index) => (
-          <DayCell key={index} date={date} currentMonth={currentMonth} shifts={shifts} onDayClick={onDayClick} />
+          <DayCell 
+            key={index} 
+            date={date} 
+            currentMonth={currentMonth} 
+            shifts={shifts} 
+            userAssignments={userAssignments}
+            onDayClick={onDayClick}
+            onShiftClick={onShiftClick}
+          />
         ))}
       </div>
     </div>

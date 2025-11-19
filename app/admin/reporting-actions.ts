@@ -16,6 +16,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { ShiftFillRate, VolunteerAttendance } from "@/types/database"
 
 // =====================================================
 // TYPES
@@ -31,20 +32,6 @@ export type AttendanceRecord = {
   slot: string
   status: "Completed" | "Today" | "Upcoming"
   hours: number
-}
-
-export type ShiftFillRate = {
-  shift_id: string
-  shift_date: string
-  start_time: string
-  end_time: string
-  slot: string
-  capacity: number
-  filled_count: number
-  fill_rate_percent: number
-  spots_remaining: number
-  fill_status: "Full" | "Partial" | "Empty"
-  volunteer_names: string | null
 }
 
 export type VolunteerHours = {
@@ -66,6 +53,8 @@ export type ShiftStatistics = {
   total_capacity: number
   total_filled: number
 }
+
+export type { ShiftFillRate, VolunteerAttendance }
 
 // =====================================================
 // AUTHORIZATION HELPER
@@ -118,9 +107,10 @@ export async function getVolunteerAttendance(
     if (error) throw error
 
     return { success: true, data: data as AttendanceRecord[] }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get volunteer attendance error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -148,9 +138,10 @@ export async function calculateVolunteerHours(
       success: true,
       data: data[0] || { total_hours: 0, shift_count: 0, hours_breakdown: [] },
     }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Calculate volunteer hours error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -180,9 +171,10 @@ export async function getShiftFillRates(
     if (error) throw error
 
     return { success: true, data: data as ShiftFillRate[] }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get shift fill rates error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -205,9 +197,10 @@ export async function getShiftStatistics(
     if (error) throw error
 
     return { success: true, data: data[0] || null }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get shift statistics error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -233,9 +226,10 @@ export async function getPopularTimeSlots(): Promise<{
     if (error) throw error
 
     return { success: true, data: data || [] }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get popular time slots error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -262,9 +256,15 @@ export async function exportVolunteersCSV(): Promise<{
 
     if (error) throw error
 
-    // Generate CSV
     const headers = ["Name", "Email", "Phone", "Role", "Status", "Joined Date"]
-    const rows = data.map((v) => [
+    const rows = data.map((v: {
+      name: string | null
+      email: string | null
+      phone: string | null
+      role: string | null
+      active: boolean
+      created_at: string | null
+    }) => [
       v.name || "",
       v.email || "",
       v.phone || "",
@@ -276,9 +276,10 @@ export async function exportVolunteersCSV(): Promise<{
     const csv = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
 
     return { success: true, csv }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Export volunteers CSV error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -303,9 +304,8 @@ export async function exportShiftReportCSV(
 
     if (error) throw error
 
-    // Generate CSV
     const headers = ["Date", "Time Slot", "Capacity", "Filled", "Fill Rate %", "Status", "Volunteers"]
-    const rows = data.map((s: any) => [
+    const rows = (data as ShiftFillRate[]).map((s) => [
       new Date(s.shift_date).toLocaleDateString(),
       s.slot,
       s.capacity.toString(),
@@ -318,9 +318,10 @@ export async function exportShiftReportCSV(
     const csv = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
 
     return { success: true, csv }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Export shift report CSV error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -352,9 +353,8 @@ export async function exportAttendanceCSV(
 
     if (error) throw error
 
-    // Generate CSV
     const headers = ["Volunteer Name", "Email", "Shift Date", "Time Slot", "Status", "Hours"]
-    const rows = data.map((a: any) => [
+    const rows = (data as VolunteerAttendance[]).map((a) => [
       a.volunteer_name || "",
       a.volunteer_email || "",
       new Date(a.shift_date).toLocaleDateString(),
@@ -366,9 +366,10 @@ export async function exportAttendanceCSV(
     const csv = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
 
     return { success: true, csv }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Export attendance CSV error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -393,7 +394,6 @@ export async function getDashboardStats(): Promise<{
   try {
     const { supabase } = await verifyAdminRole()
 
-    // Run queries in parallel
     const [volunteersResult, shiftsResult, assignmentsResult, activeResult] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("shifts").select("id", { count: "exact", head: true }),
@@ -401,7 +401,7 @@ export async function getDashboardStats(): Promise<{
       supabase.rpc("get_active_volunteers", {
         p_start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
         p_end_date: new Date().toISOString().split("T")[0],
-        p_limit: 1000, // Get all to count
+        p_limit: 1000,
       }),
     ])
 
@@ -414,9 +414,10 @@ export async function getDashboardStats(): Promise<{
         activeThisMonth: activeResult.data?.length || 0,
       },
     }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get dashboard stats error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -450,7 +451,7 @@ export async function getRecentActivity(limit = 10): Promise<{
     return {
       success: true,
       data:
-        data?.map((item: any) => ({
+        (data as VolunteerAttendance[])?.map((item) => ({
           id: item.assignment_id,
           type: "signup" as const,
           volunteer_name: item.volunteer_name,
@@ -459,8 +460,9 @@ export async function getRecentActivity(limit = 10): Promise<{
           created_at: item.signed_up_at,
         })) || [],
     }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get recent activity error:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 }

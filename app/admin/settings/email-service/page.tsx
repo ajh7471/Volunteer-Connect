@@ -3,13 +3,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getEmailServiceConfigs } from "@/app/admin/email-service-actions"
-import { AlertCircle, CheckCircle2, Mail, Settings } from "lucide-react"
+import { AlertCircle, CheckCircle2, Mail, Settings } from 'lucide-react'
 import { SendGridForm } from "./sendgrid-form"
 import { GmailForm } from "./gmail-form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-async function EmailServiceConfigurations() {
-  const configs = await getEmailServiceConfigs()
+interface EmailServiceConfig {
+  id: string
+  service_name: "sendgrid" | "gmail"
+  is_active: boolean
+  is_validated?: boolean
+  priority: number
+  sendgrid_api_key?: string
+  sendgrid_from_email?: string
+  sendgrid_from_name?: string
+  gmail_client_id?: string
+  gmail_client_secret?: string
+  gmail_refresh_token?: string
+  gmail_from_email?: string
+  validation_error?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[] }) {
   const sendgridConfig = configs.find((c) => c.service_name === "sendgrid")
   const gmailConfig = configs.find((c) => c.service_name === "gmail")
 
@@ -46,6 +63,12 @@ async function EmailServiceConfigurations() {
                 )}
                 {sendgridConfig.is_active && <Badge variant="outline">Active</Badge>}
                 <Badge variant="secondary">Priority: {sendgridConfig.priority}</Badge>
+                {sendgridConfig.validation_error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{sendgridConfig.validation_error}</AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           )}
@@ -74,6 +97,12 @@ async function EmailServiceConfigurations() {
                 )}
                 {gmailConfig.is_active && <Badge variant="outline">Active</Badge>}
                 <Badge variant="secondary">Priority: {gmailConfig.priority}</Badge>
+                {gmailConfig.validation_error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{gmailConfig.validation_error}</AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           )}
@@ -150,6 +179,8 @@ async function EmailServiceConfigurations() {
 }
 
 export default async function EmailServicePage() {
+  const configs = await getEmailServiceConfigs()
+
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <div className="mb-8">
@@ -159,9 +190,7 @@ export default async function EmailServicePage() {
         </p>
       </div>
 
-      <Suspense fallback={<div>Loading configurations...</div>}>
-        <EmailServiceConfigurations />
-      </Suspense>
+      <EmailServiceConfigurations configs={configs} />
     </div>
   )
 }

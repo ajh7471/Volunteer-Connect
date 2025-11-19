@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient"
 import { ymd } from "./date"
+import { ShiftAssignment, AssignmentWithRelations } from "@/types/database"
 
 export type ShiftWithCapacity = {
   id: string
@@ -37,25 +38,59 @@ export async function getMonthShifts(year: number, month: number): Promise<Shift
     return []
   }
 
-  // Get assignment counts for each shift
-  const shiftsWithCounts = await Promise.all(
-    (shifts || []).map(async (shift) => {
-      const { count } = await supabase
-        .from("shift_assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("shift_id", shift.id)
+  if (!shifts || shifts.length === 0) {
+    return []
+  }
 
-      return {
-        ...shift,
-        assignments_count: count || 0,
-      }
-    }),
-  )
+  const shiftIds = shifts.map((s) => s.id)
+  
+  const { data: allAssignments, error: assignmentError } = await supabase
+    .from("shift_assignments")
+    .select("shift_id")
+    .in("shift_id", shiftIds)
+
+  if (assignmentError) {
+    console.error("[v0] Error fetching assignments:", assignmentError)
+  }
+
+  // Create a map of shift_id -> count
+  const assignmentCounts = new Map<string, number>()
+  if (allAssignments) {
+    allAssignments.forEach((a) => {
+      const current = assignmentCounts.get(a.shift_id) || 0
+      assignmentCounts.set(a.shift_id, current + 1)
+    })
+  }
+
+  const shiftsWithCounts = shifts.map((shift) => {
+    const count = assignmentCounts.get(shift.id) || 0
+    return {
+      ...shift,
+      assignments_count: count,
+    }
+  })
 
   return shiftsWithCounts
 }
 
 export async function signUpForShift(shiftId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (profileError) {
+    return { success: false, error: "Error verifying user profile" }
+  }
+
+  if (!profile) {
+    return {
+      success: false,
+      error: "User profile not found. Please contact an administrator to complete your registration.",
+    }
+  }
+
   // Check if already signed up
   const { data: existing } = await supabase
     .from("shift_assignments")
@@ -84,6 +119,7 @@ export async function signUpForShift(shiftId: string, userId: string): Promise<{
   const { error } = await supabase.from("shift_assignments").insert({ shift_id: shiftId, user_id: userId })
 
   if (error) {
+    console.error("[v0] Error inserting shift assignment:", error)
     return { success: false, error: error.message }
   }
 
@@ -126,18 +162,18 @@ export async function getUserAssignments(
     return []
   }
 
-  return data
-    .filter((a: any) => {
+  return (data as AssignmentWithRelations[])
+    .filter((a) => {
       const date = a.shifts?.shift_date
       return date && date >= startDate && date <= endDate
     })
-    .map((a: any) => ({
+    .map((a) => ({
       id: a.id,
       shift_id: a.shift_id,
-      shift_date: a.shifts.shift_date,
-      slot: a.shifts.slot,
-      start_time: a.shifts.start_time,
-      end_time: a.shifts.end_time,
+      shift_date: a.shifts!.shift_date,
+      slot: a.shifts!.slot,
+      start_time: a.shifts!.start_time,
+      end_time: a.shifts!.end_time,
     }))
 }
 

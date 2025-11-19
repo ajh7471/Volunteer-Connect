@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/lib/toast"
-import { Mail, Send, Users } from "lucide-react"
+import { Mail, Send, Users } from 'lucide-react'
 
 type EmailLog = {
   id: string
@@ -37,7 +37,15 @@ type Volunteer = {
   name: string
   email: string
   email_opt_in: boolean
-  email_categories: any
+  email_categories: Record<string, boolean> | null
+}
+
+type Profile = {
+  id: string
+  name: string
+  email_opt_in: boolean
+  email_categories: Record<string, boolean> | null
+  email?: string
 }
 
 export default function AdminEmailsPage() {
@@ -61,11 +69,11 @@ export default function AdminEmailsPage() {
 
     if (profiles) {
       const enrichedVolunteers = await Promise.all(
-        profiles.map(async (profile) => {
+        profiles.map(async (profile: Profile) => {
           const { data } = await supabase.auth.admin.getUserById(profile.id)
           return {
             ...profile,
-            email: data.user?.email || "",
+            email: data.user?.email || profile.email || "",
           }
         }),
       )
@@ -84,7 +92,7 @@ export default function AdminEmailsPage() {
   function getFilteredVolunteers() {
     if (filterCategory === "all") return volunteers
 
-    return volunteers.filter((v) => {
+    return volunteers.filter((v: Volunteer) => {
       const categories = v.email_categories || {}
 
       switch (filterCategory) {
@@ -130,8 +138,8 @@ export default function AdminEmailsPage() {
       const { data: authUser } = await supabase.auth.getUser()
 
       // Log email for each recipient
-      const emailPromises = selectedRecipients.map(async (recipientId) => {
-        const volunteer = volunteers.find((v) => v.id === recipientId)
+      const emailPromises = selectedRecipients.map(async (recipientId: string) => {
+        const volunteer = volunteers.find((v: Volunteer) => v.id === recipientId)
 
         return supabase.from("email_logs").insert({
           sent_by: authUser.user?.id,
@@ -151,8 +159,9 @@ export default function AdminEmailsPage() {
       setSubject("")
       setMessage("")
       loadEmailLogs()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send emails")
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send emails"
+      toast.error(errorMessage)
     }
   }
 

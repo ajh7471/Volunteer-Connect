@@ -75,7 +75,9 @@
 }
 
 @theme inline {
-  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
+  /* Removed font variable references that were causing CSS parsing errors */
+  /* Fonts are applied directly via className in layout.tsx */
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

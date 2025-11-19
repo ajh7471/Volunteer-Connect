@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Trash2, UserPlus, AlertCircle, Loader2 } from "lucide-react"
-import { ymd } from "@/lib/date"
+import { Calendar, Trash2, UserPlus, AlertCircle, Loader2 } from 'lucide-react'
+import { ymd, formatTime12Hour } from "@/lib/date"
 import Link from "next/link"
 import { toast } from "@/lib/toast"
 
@@ -65,40 +65,65 @@ export default function AdminShiftsPage() {
 
     if (shiftsData) {
       const sorted = shiftsData.sort(
-        (a, b) => SLOT_ORDER[a.slot as keyof typeof SLOT_ORDER] - SLOT_ORDER[b.slot as keyof typeof SLOT_ORDER],
+        (a: Shift, b: Shift) => SLOT_ORDER[a.slot as keyof typeof SLOT_ORDER] - SLOT_ORDER[b.slot as keyof typeof SLOT_ORDER],
       )
       setShifts(sorted)
 
-      // Load assignments for these shifts
-      const shiftIds = sorted.map((s) => s.id)
-      if (shiftIds.length > 0) {
-        const { data: assignData } = await supabase
-          .from("shift_assignments")
-          .select("*, profiles(name, phone)")
-          .in("shift_id", shiftIds)
+      // Parallelize fetching assignments and volunteers
+      const shiftIds = sorted.map((s: Shift) => s.id)
+      
+      const [assignResult, volResult] = await Promise.all([
+        shiftIds.length > 0 
+          ? supabase
+              .from("shift_assignments")
+              .select("*, profiles(name, phone)")
+              .in("shift_id", shiftIds)
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from("profiles")
+          .select("id, name, phone, active")
+          .or("active.is.null,active.eq.true")
+          .order("name", { ascending: true })
+      ])
 
-        if (assignData) {
-          const grouped: Record<string, Assignment[]> = {}
-          assignData.forEach((a) => {
-            if (!grouped[a.shift_id]) grouped[a.shift_id] = []
-            grouped[a.shift_id].push(a as Assignment)
-          })
-          setAssignments(grouped)
-        }
+      // Process assignments
+      if (assignResult.data) {
+        const grouped: Record<string, Assignment[]> = {}
+        assignResult.data.forEach((a: Assignment) => {
+          if (!grouped[a.shift_id]) grouped[a.shift_id] = []
+          grouped[a.shift_id].push(a)
+        })
+        setAssignments(grouped)
       } else {
         setAssignments({})
       }
-    }
 
-    // Load active volunteers for assignment dropdown
-    const { data: volData } = await supabase
-      .from("profiles")
-      .select("id, name, phone, active")
-      .or("active.is.null,active.eq.true")
-      .order("name", { ascending: true })
-
-    if (volData) {
-      setVolunteers(volData as Volunteer[])
+      // Process volunteers
+      if (volResult.data) {
+        setVolunteers(volResult.data as Volunteer[])
+      }
+    } else {
+      // Even if no shifts, we might want to load volunteers? 
+      // Probably not needed if no shifts to assign to.
+      setShifts([])
+      setAssignments({})
+      
+      // Still load volunteers in case they want to seed and then assign immediately?
+      // The original code loaded volunteers regardless of shifts existence (it was outside the if(shiftsData) block? No, it was after.)
+      // Wait, original code:
+      // if (shiftsData) { ... }
+      // const { data: volData } = await supabase...
+      // So volunteers were loaded even if no shifts.
+      
+      const { data: volData } = await supabase
+        .from("profiles")
+        .select("id, name, phone, active")
+        .or("active.is.null,active.eq.true")
+        .order("name", { ascending: true })
+        
+      if (volData) {
+        setVolunteers(volData as Volunteer[])
+      }
     }
 
     setLoading(false)
@@ -259,7 +284,7 @@ export default function AdminShiftsPage() {
 
         {/* Shifts List */}
         {!loading &&
-          shifts.map((shift) => {
+          shifts.map((shift: Shift) => {
             const currentAssignments = assignments[shift.id] || []
             const availableSlots = shift.capacity - currentAssignments.length
 
@@ -274,7 +299,7 @@ export default function AdminShiftsPage() {
                         {shift.slot === "PM" && "Afternoon Shift"}
                       </CardTitle>
                       <CardDescription>
-                        {shift.start_time} - {shift.end_time}
+                        {formatTime12Hour(shift.start_time)} - {formatTime12Hour(shift.end_time)}
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
@@ -287,7 +312,7 @@ export default function AdminShiftsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n: number) => (
                             <SelectItem key={n} value={String(n)}>
                               {n}
                             </SelectItem>
@@ -306,7 +331,7 @@ export default function AdminShiftsPage() {
                     <div className="mb-4 space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Assigned Volunteers:</p>
                       <div className="space-y-2">
-                        {currentAssignments.map((assignment) => (
+                        {currentAssignments.map((assignment: Assignment) => (
                           <div
                             key={assignment.id}
                             className="flex items-center justify-between rounded-lg border bg-card p-3"
@@ -338,8 +363,8 @@ export default function AdminShiftsPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {volunteers
-                            .filter((v) => !currentAssignments.some((a) => a.user_id === v.id))
-                            .map((volunteer) => (
+                            .filter((v: Volunteer) => !currentAssignments.some((a: Assignment) => a.user_id === v.id))
+                            .map((volunteer: Volunteer) => (
                               <SelectItem key={volunteer.id} value={volunteer.id}>
                                 {volunteer.name || "Unnamed"} {volunteer.phone ? `(${volunteer.phone})` : ""}
                               </SelectItem>

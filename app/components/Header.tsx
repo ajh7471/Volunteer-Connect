@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from "@/lib/supabaseClient"
 import { useSessionRole } from "@/lib/useSession"
 import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
+import { Menu, X } from 'lucide-react'
 import { useState } from "react"
+import { useToast } from "@/hooks/use-toast"
 
 function NavLink({ href, label, onClick }: { href: string; label: string; onClick?: () => void }) {
   const pathname = usePathname()
@@ -29,10 +30,40 @@ export default function Header() {
   const r = useRouter()
   const { userId, role, loading } = useSessionRole()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const { toast } = useToast()
 
   const signOut = async () => {
-    await supabase.auth.signOut()
-    r.push("/auth/login")
+    setSigningOut(true)
+
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      
+      if (error) {
+        throw error
+      }
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('volunteer-hub-cache')
+          sessionStorage.clear()
+        } catch (storageError) {
+          console.error('Storage cleanup error:', storageError)
+        }
+      }
+
+      window.location.href = "/"
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
+      console.error("Sign out error:", error)
+      setSigningOut(false)
+      
+      toast({
+        title: "Sign out failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -40,12 +71,11 @@ export default function Header() {
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="text-xl font-bold text-foreground">
-            Volunteer Connect
+            Volunteer Hub
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 md:flex">
-            <NavLink href="/" label="Home" />
             {userId && role === "volunteer" && <NavLink href="/volunteer" label="Dashboard" />}
             {userId && <NavLink href="/calendar" label="Calendar" />}
             {userId && <NavLink href="/my-schedule" label="My Schedule" />}
@@ -55,19 +85,22 @@ export default function Header() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden items-center gap-2 md:flex">
-            {loading ? (
-              <span className="text-sm text-muted-foreground">Loading...</span>
+            {loading || signingOut ? (
+              <span className="text-sm text-muted-foreground">{signingOut ? "Signing out..." : "Loading..."}</span>
             ) : userId ? (
-              <Button onClick={signOut} variant="default" size="sm">
+              <Button onClick={signOut} variant="default" size="sm" disabled={signingOut}>
                 Sign Out
               </Button>
             ) : (
               <>
                 <Button asChild variant="ghost" size="sm">
-                  <Link href="/auth/login">Login</Link>
+                  <Link href="/">Login</Link>
                 </Button>
                 <Button asChild variant="default" size="sm">
                   <Link href="/auth/signup">Sign Up</Link>
+                </Button>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/about">About</Link>
                 </Button>
               </>
             )}
@@ -82,7 +115,6 @@ export default function Header() {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <nav className="flex flex-col gap-2 py-4 md:hidden">
-            <NavLink href="/" label="Home" onClick={() => setMobileMenuOpen(false)} />
             {userId && role === "volunteer" && (
               <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} />
             )}
@@ -92,16 +124,19 @@ export default function Header() {
             {role === "admin" && <NavLink href="/admin" label="Admin" onClick={() => setMobileMenuOpen(false)} />}
             <div className="mt-2 flex flex-col gap-2">
               {userId ? (
-                <Button onClick={signOut} variant="default" size="sm" className="w-full">
-                  Sign Out
+                <Button onClick={signOut} variant="default" size="sm" className="w-full" disabled={signingOut}>
+                  {signingOut ? "Signing out..." : "Sign Out"}
                 </Button>
               ) : (
                 <>
                   <Button asChild variant="ghost" size="sm" className="w-full">
-                    <Link href="/auth/login">Login</Link>
+                    <Link href="/">Login</Link>
                   </Button>
                   <Button asChild variant="default" size="sm" className="w-full">
                     <Link href="/auth/signup">Sign Up</Link>
+                  </Button>
+                  <Button asChild variant="ghost" size="sm" className="w-full">
+                    <Link href="/about">About</Link>
                   </Button>
                 </>
               )}
