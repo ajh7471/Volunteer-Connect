@@ -89,9 +89,9 @@ export default function AdminShiftsPage() {
       // Process assignments
       if (assignResult.data) {
         const grouped: Record<string, Assignment[]> = {}
-        assignResult.data.forEach((a) => {
+        assignResult.data.forEach((a: Assignment) => {
           if (!grouped[a.shift_id]) grouped[a.shift_id] = []
-          grouped[a.shift_id].push(a as Assignment)
+          grouped[a.shift_id].push(a)
         })
         setAssignments(grouped)
       } else {
