@@ -301,7 +301,7 @@ export default function MySchedulePage() {
       !error && data
         ? data
             .filter((a: { profiles: { id: string; name: string; email: string; phone: string | null } | null; id: string }) => a.profiles && a.id !== shiftId)
-            .map((a) => ({
+            .map((a: { profiles: { id: string; name: string; email: string; phone: string | null } | null; id: string }) => ({
               id: a.profiles?.id || '',
               name: a.profiles?.name || "Anonymous",
               email: a.profiles?.email || "",
