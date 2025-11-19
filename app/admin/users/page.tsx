@@ -134,7 +134,10 @@ export default function AdminUsersPage() {
       return
     }
 
-    const result = await createUserAccount(newUser)
+    const result = await createUserAccount({
+      ...newUser,
+      role: newUser.role as "volunteer" | "admin",
+    })
 
     if (result.success) {
       toast.success(`User ${newUser.name} created successfully`)
