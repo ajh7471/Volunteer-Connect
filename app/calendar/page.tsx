@@ -52,7 +52,7 @@ export default function CalendarPage() {
 
     // Load user's assignments for these shifts
     if (userId) {
-      const shiftIds = monthShifts.map((s) => s.id)
+      const shiftIds = monthShifts.map((s: ShiftWithCapacity) => s.id)
       if (shiftIds.length > 0) {
         const { data } = await supabase
           .from("shift_assignments")
@@ -61,7 +61,7 @@ export default function CalendarPage() {
           .in("shift_id", shiftIds)
 
         if (data) {
-          setUserAssignments(new Set(data.map((a) => a.shift_id)))
+          setUserAssignments(new Set(data.map((a: { shift_id: string }) => a.shift_id)))
         } else {
           setUserAssignments(new Set())
         }
@@ -242,7 +242,7 @@ export default function CalendarPage() {
   }
 
   const selectedDateShifts = selectedDate
-    ? shifts.filter((s) => {
+    ? shifts.filter((s: ShiftWithCapacity) => {
         if (s.shift_date !== ymd(selectedDate)) return false
 
         const now = new Date()

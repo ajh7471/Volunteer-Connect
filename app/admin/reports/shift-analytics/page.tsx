@@ -94,7 +94,7 @@ export default function ShiftAnalyticsPage() {
     }
   }
 
-  const filteredFillRates = fillRates.filter((shift) => {
+  const filteredFillRates = fillRates.filter((shift: ShiftFillRate) => {
     if (filterStatus === "all") return true
     return shift.fill_status.toLowerCase() === filterStatus.toLowerCase()
   })
@@ -287,7 +287,7 @@ export default function ShiftAnalyticsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFillRates.map((shift) => (
+                    {filteredFillRates.map((shift: ShiftFillRate) => (
                       <TableRow key={shift.shift_id}>
                         <TableCell>{new Date(shift.shift_date).toLocaleDateString()}</TableCell>
                         <TableCell>

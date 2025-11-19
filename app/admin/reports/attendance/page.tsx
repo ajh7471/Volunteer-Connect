@@ -166,7 +166,7 @@ export default function AttendanceReportPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Volunteers</SelectItem>
-                    {volunteers.map((v) => (
+                    {volunteers.map((v: { id: string; name: string; email: string }) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.name || v.email}
                       </SelectItem>
@@ -281,7 +281,7 @@ export default function AttendanceReportPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendance.map((record) => (
+                    {attendance.map((record: AttendanceRecord) => (
                       <TableRow key={record.assignment_id}>
                         <TableCell>{new Date(record.shift_date).toLocaleDateString()}</TableCell>
                         <TableCell>

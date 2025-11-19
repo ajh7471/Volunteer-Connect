@@ -84,7 +84,7 @@ export default function AdminEmailsPage() {
   function getFilteredVolunteers() {
     if (filterCategory === "all") return volunteers
 
-    return volunteers.filter((v) => {
+    return volunteers.filter((v: Volunteer) => {
       const categories = v.email_categories || {}
 
       switch (filterCategory) {
@@ -130,8 +130,8 @@ export default function AdminEmailsPage() {
       const { data: authUser } = await supabase.auth.getUser()
 
       // Log email for each recipient
-      const emailPromises = selectedRecipients.map(async (recipientId) => {
-        const volunteer = volunteers.find((v) => v.id === recipientId)
+      const emailPromises = selectedRecipients.map(async (recipientId: string) => {
+        const volunteer = volunteers.find((v: Volunteer) => v.id === recipientId)
 
         return supabase.from("email_logs").insert({
           sent_by: authUser.user?.id,

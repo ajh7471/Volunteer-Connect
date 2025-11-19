@@ -334,7 +334,7 @@ export default function ReportsPage() {
                 <CardContent>
                   {popularSlots.length > 0 ? (
                     <div className="space-y-3">
-                      {popularSlots.map((slot, idx) => (
+                      {popularSlots.map((slot: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between">
                           <div>
                             <p className="font-medium">{slot.slot}</p>
@@ -367,7 +367,7 @@ export default function ReportsPage() {
               <CardContent>
                 {recentActivity.length > 0 ? (
                   <div className="space-y-3">
-                    {recentActivity.map((activity) => (
+                    {recentActivity.map((activity: any) => (
                       <div key={activity.id} className="flex items-start justify-between border-b pb-3 last:border-0">
                         <div>
                           <p className="font-medium">{activity.volunteer_name}</p>

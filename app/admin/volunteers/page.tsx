@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Download } from "lucide-react"
+import { Search, Download } from 'lucide-react'
 
 type Volunteer = {
   id: string
@@ -60,7 +60,7 @@ export default function VolunteersPage() {
 
   function exportToCSV() {
     const headers = ["Name", "Phone", "Role", "Status", "Joined"]
-    const rows = filtered.map((v) => [
+    const rows = filtered.map((v: Volunteer) => [
       v.name || "Unnamed",
       v.phone || "",
       v.role || "volunteer",
@@ -142,7 +142,7 @@ export default function VolunteersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((v) => (
+                    {filtered.map((v: Volunteer) => (
                       <TableRow key={v.id}>
                         <TableCell className="font-medium">{v.name || "Unnamed"}</TableCell>
                         <TableCell>{v.phone || "No phone"}</TableCell>

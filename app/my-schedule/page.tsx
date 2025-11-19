@@ -120,7 +120,7 @@ export default function MySchedulePage() {
           start_time: a.shifts.start_time,
           end_time: a.shifts.end_time,
         }))
-        .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
+        .sort((a: Assignment, b: Assignment) => a.shift_date.localeCompare(b.shift_date))
 
       setAssignments(formatted)
     }
@@ -140,7 +140,7 @@ export default function MySchedulePage() {
           start_time: w.shifts.start_time,
           end_time: w.shifts.end_time,
         }))
-        .sort((a, b) => a.shift_date.localeCompare(b.shift_date))
+        .sort((a: WaitlistEntry, b: WaitlistEntry) => a.shift_date.localeCompare(b.shift_date))
 
       setWaitlistEntries(formattedWaitlist)
     }
@@ -217,7 +217,7 @@ export default function MySchedulePage() {
   }
 
   async function handleAddAllToCalendar() {
-    const events: CalendarEvent[] = assignments.map((assignment) => {
+    const events: CalendarEvent[] = assignments.map((assignment: Assignment) => {
       const shiftDate = parseDate(assignment.shift_date)
       const [startHour, startMin] = assignment.start_time.split(":").map(Number)
       const [endHour, endMin] = assignment.end_time.split(":").map(Number)
@@ -335,7 +335,7 @@ export default function MySchedulePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {waitlistEntries.map((entry) => {
+                {waitlistEntries.map((entry: WaitlistEntry) => {
                   const date = parseDate(entry.shift_date)
                   const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
                   const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
@@ -392,7 +392,7 @@ export default function MySchedulePage() {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {assignments.map((assignment) => {
+            {assignments.map((assignment: Assignment) => {
               const date = parseDate(assignment.shift_date)
               const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
               const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
@@ -453,7 +453,7 @@ export default function MySchedulePage() {
                               </p>
                             </div>
                           ) : (
-                            teamMembers.map((member) => (
+                            teamMembers.map((member: TeamMember) => (
                               <div key={member.id} className="bg-muted/50 rounded-md p-2 space-y-1">
                                 <p className="text-sm font-medium">{member.name}</p>
                                 <div className="space-y-0.5">
