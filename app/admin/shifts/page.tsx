@@ -29,7 +29,7 @@ type Assignment = {
   profiles: {
     name: string | null
     phone: string | null
-  }
+  } | null // Allow profiles to be null
 }
 
 type Volunteer = {
@@ -317,13 +317,13 @@ export default function AdminShiftsPage() {
                             className="flex items-center justify-between rounded-lg border bg-card p-3"
                           >
                             <div>
-                              <p className="font-medium">{assignment.profiles.name || "Unnamed Volunteer"}</p>
-                              <p className="text-sm text-muted-foreground">{assignment.profiles.phone || "No phone"}</p>
+                              <p className="font-medium">{assignment.profiles?.name || "Unnamed Volunteer"}</p>
+                              <p className="text-sm text-muted-foreground">{assignment.profiles?.phone || "No phone"}</p>
                             </div>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => removeAssignment(assignment.id, assignment.profiles.name || "Unnamed")}
+                              onClick={() => removeAssignment(assignment.id, assignment.profiles?.name || "Unnamed")}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
