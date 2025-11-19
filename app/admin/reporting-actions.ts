@@ -54,6 +54,8 @@ export type ShiftStatistics = {
   total_filled: number
 }
 
+export type { ShiftFillRate, VolunteerAttendance }
+
 // =====================================================
 // AUTHORIZATION HELPER
 // =====================================================
