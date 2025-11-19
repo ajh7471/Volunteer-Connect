@@ -56,7 +56,7 @@ export async function getMonthShifts(year: number, month: number): Promise<Shift
   // Create a map of shift_id -> count
   const assignmentCounts = new Map<string, number>()
   if (allAssignments) {
-    allAssignments.forEach((a) => {
+    allAssignments.forEach((a: { shift_id: string }) => {
       const current = assignmentCounts.get(a.shift_id) || 0
       assignmentCounts.set(a.shift_id, current + 1)
     })
