@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
   try {
     const { data } = await supabase.auth.getUser()
     user = data.user
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If we get a session error (403), treat it as no user
     // This happens during sign-out when cookies are in transition
     user = null

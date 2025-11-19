@@ -33,26 +33,25 @@ export function DayCell({
 
   // Get shifts for this date
   const dateStr = date.toISOString().split("T")[0]
-  const dayShifts = shifts.filter((s) => s.shift_date === dateStr)
+  const dayShifts = shifts.filter((s: ShiftWithCapacity) => s.shift_date === dateStr)
 
   const now = new Date()
-  const availableShifts = dayShifts.filter((shift) => {
-    if (isPastDay) return false // Past days have no available shifts
+  const availableShifts = dayShifts.filter((shift: ShiftWithCapacity) => {
+    if (isPastDay) return false
 
     if (isToday) {
-      // For today, check if shift end time has passed
       const [hours, minutes] = shift.end_time.split(":").map(Number)
       const shiftEndTime = new Date()
       shiftEndTime.setHours(hours, minutes, 0, 0)
       return shiftEndTime > now
     }
 
-    return true // Future days show all shifts
+    return true
   })
 
-  const amShift = availableShifts.find((s) => s.slot === "AM")
-  const midShift = availableShifts.find((s) => s.slot === "MID")
-  const pmShift = availableShifts.find((s) => s.slot === "PM")
+  const amShift = availableShifts.find((s: ShiftWithCapacity) => s.slot === "AM")
+  const midShift = availableShifts.find((s: ShiftWithCapacity) => s.slot === "MID")
+  const pmShift = availableShifts.find((s: ShiftWithCapacity) => s.slot === "PM")
 
   const handleClick = () => {
     if (!isPastDay) {

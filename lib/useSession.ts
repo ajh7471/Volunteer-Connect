@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 type Role = "admin" | "volunteer"
 
@@ -45,7 +46,7 @@ export function useSessionRole() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       if (!mounted) return
 
       if (event === "SIGNED_OUT") {

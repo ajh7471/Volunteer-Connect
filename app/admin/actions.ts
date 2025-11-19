@@ -390,7 +390,7 @@ export async function getAdminUsers() {
 
   // Map auth data to profiles
   const enrichedUsers = profiles.map((profile) => {
-    const authUser = authUsers.find((u) => u.id === profile.id)
+    const authUser = authUsers.find((u: { id: string; email?: string; last_sign_in_at?: string }) => u.id === profile.id)
     return {
       ...profile,
       email: authUser?.email || "No email",

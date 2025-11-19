@@ -226,7 +226,7 @@ export default function VolunteerDashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {thisMonthShifts.map((shift, index) => {
+                {thisMonthShifts.map((shift: UpcomingShift, index: number) => {
                   const date = parseDate(shift.shift_date)
                   const isNextShift = stats.nextShift?.id === shift.id
                   const today = new Date()

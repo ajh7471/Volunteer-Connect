@@ -360,7 +360,7 @@ export default function CalendarPage() {
                     <p className="text-sm text-muted-foreground">No shifts have been created for this date yet.</p>
                   )}
 
-                  {selectedDateShifts.map((shift) => {
+                  {selectedDateShifts.map((shift: ShiftWithCapacity) => {
                     const status = getCapacityStatus(shift.capacity, shift.assignments_count)
                     const isAssigned = userAssignments.has(shift.id)
                     const isFull = status === "full"

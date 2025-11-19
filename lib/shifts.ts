@@ -62,7 +62,14 @@ export async function getMonthShifts(year: number, month: number): Promise<Shift
     })
   }
 
-  const shiftsWithCounts = shifts.map((shift) => {
+  const shiftsWithCounts = shifts.map((shift: {
+    id: string
+    shift_date: string
+    slot: "AM" | "MID" | "PM"
+    start_time: string
+    end_time: string
+    capacity: number
+  }) => {
     const count = assignmentCounts.get(shift.id) || 0
     return {
       ...shift,

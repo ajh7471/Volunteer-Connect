@@ -295,17 +295,27 @@ export default function MySchedulePage() {
       `,
       )
       .eq("shift_id", shiftId)
-      .neq("user_id", userId!) // Exclude current user
+      .neq("user_id", userId!)
+
+    interface AssignmentWithProfile {
+      user_id: string;
+      profiles: {
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+      } | null;
+    }
 
     const teamMembers =
       !error && data
-        ? data
-            .filter((a: { profiles: { id: string; name: string; email: string; phone: string | null } | null; id: string }) => a.profiles && a.id !== shiftId)
-            .map((a: { profiles: { id: string; name: string; email: string; phone: string | null } | null; id: string }) => ({
-              id: a.profiles?.id || '',
-              name: a.profiles?.name || "Anonymous",
-              email: a.profiles?.email || "",
-              phone: a.profiles?.phone || null,
+        ? (data as AssignmentWithProfile[])
+            .filter((a: AssignmentWithProfile) => a.profiles !== null)
+            .map((a: AssignmentWithProfile) => ({
+              id: a.profiles!.id,
+              name: a.profiles!.name || "Anonymous",
+              email: a.profiles!.email || "",
+              phone: a.profiles!.phone || null,
             }))
         : []
 

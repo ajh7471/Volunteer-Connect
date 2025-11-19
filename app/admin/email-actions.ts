@@ -38,14 +38,14 @@ export async function sendEmail(formData: {
   if (!recipients) throw new Error("No recipients found")
 
   // Filter only opted-in recipients (TEST: 1.3)
-  const optedInRecipients = recipients.filter((r) => r.email_opt_in)
+  const optedInRecipients = recipients.filter((r: { email_opt_in: boolean }) => r.email_opt_in)
 
   if (optedInRecipients.length === 0) {
     throw new Error("No opted-in recipients found")
   }
 
   // Get emails from auth system
-  const emailPromises = optedInRecipients.map(async (recipient) => {
+  const emailPromises = optedInRecipients.map(async (recipient: { id: string; email_opt_in: boolean }) => {
     const { data: authUser } = await supabase.auth.admin.getUserById(recipient.id)
 
     if (!authUser.user?.email) return null
@@ -64,7 +64,7 @@ export async function sendEmail(formData: {
     return authUser.user.email
   })
 
-  const sentEmails = (await Promise.all(emailPromises)).filter((email) => email !== null)
+  const sentEmails = (await Promise.all(emailPromises)).filter((email): email is string => email !== null)
 
   revalidatePath("/admin/emails")
 
@@ -253,7 +253,7 @@ export async function getFilteredVolunteers(category?: string) {
   // Filter by category if specified
   let filtered = profiles
   if (category && category !== "all") {
-    filtered = profiles.filter((p) => {
+    filtered = profiles.filter((p: { email_categories?: Record<string, boolean> }) => {
       const categories = p.email_categories || {}
       return categories[category] === true
     })
@@ -261,7 +261,7 @@ export async function getFilteredVolunteers(category?: string) {
 
   // Get emails from auth system
   const enrichedProfiles = await Promise.all(
-    filtered.map(async (profile) => {
+    filtered.map(async (profile: { id: string; name: string; email_opt_in: boolean; email_categories?: Record<string, boolean> }) => {
       const { data: authUser } = await supabase.auth.admin.getUserById(profile.id)
       return {
         ...profile,
@@ -305,14 +305,14 @@ export async function sendBulkEmail(
   if (!recipients) throw new Error("No recipients found")
 
   // Filter only opted-in recipients
-  const optedInRecipients = recipients.filter((r) => r.email_opt_in)
+  const optedInRecipients = recipients.filter((r: { email_opt_in: boolean }) => r.email_opt_in)
 
   if (optedInRecipients.length === 0) {
     throw new Error("No opted-in recipients found")
   }
 
   // Get emails from auth system
-  const emailPromises = optedInRecipients.map(async (recipient) => {
+  const emailPromises = optedInRecipients.map(async (recipient: { id: string; email_opt_in: boolean }) => {
     const { data: authUser } = await supabase.auth.admin.getUserById(recipient.id)
 
     if (!authUser.user?.email) return null
@@ -331,7 +331,7 @@ export async function sendBulkEmail(
     return authUser.user.email
   })
 
-  const sentEmails = (await Promise.all(emailPromises)).filter((email) => email !== null)
+  const sentEmails = (await Promise.all(emailPromises)).filter((email): email is string => email !== null)
 
   revalidatePath("/admin/emails")
 
@@ -374,14 +374,14 @@ export async function sendIndividualEmails(
   if (!recipients) throw new Error("No recipients found")
 
   // Filter only opted-in recipients
-  const optedInRecipients = recipients.filter((r) => r.email_opt_in)
+  const optedInRecipients = recipients.filter((r: { email_opt_in: boolean }) => r.email_opt_in)
 
   if (optedInRecipients.length === 0) {
     throw new Error("No opted-in recipients found")
   }
 
   // Get emails from auth system
-  const emailPromises = optedInRecipients.map(async (recipient) => {
+  const emailPromises = optedInRecipients.map(async (recipient: { id: string; email_opt_in: boolean }) => {
     const { data: authUser } = await supabase.auth.admin.getUserById(recipient.id)
 
     if (!authUser.user?.email) return null
@@ -400,7 +400,7 @@ export async function sendIndividualEmails(
     return authUser.user.email
   })
 
-  const sentEmails = (await Promise.all(emailPromises)).filter((email) => email !== null)
+  const sentEmails = (await Promise.all(emailPromises)).filter((email): email is string => email !== null)
 
   revalidatePath("/admin/emails")
 
