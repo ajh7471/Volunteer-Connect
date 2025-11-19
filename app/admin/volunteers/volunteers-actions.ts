@@ -1,7 +1,6 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 
 export type VolunteerData = {
   id: string
@@ -16,8 +15,7 @@ export type VolunteerData = {
 }
 
 export async function getAllVolunteers(statusFilter: string = "all") {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = await createClient()
 
   try {
     console.log("[v0] Server: Loading volunteers with filter:", statusFilter)
@@ -130,8 +128,7 @@ export async function getAllVolunteers(statusFilter: string = "all") {
 }
 
 export async function syncMissingProfiles() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = await createClient()
 
   try {
     // Fetch all auth users
