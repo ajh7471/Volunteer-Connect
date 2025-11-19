@@ -4,7 +4,7 @@ import { usePathname, useParams } from 'next/navigation'
 import Link from "next/link"
 import { ChevronRight, Home } from 'lucide-react'
 import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import { getUserProfile } from "@/app/admin/actions"
 
 type BreadcrumbItem = {
   label: string
@@ -18,19 +18,15 @@ export function BreadcrumbNav() {
   const [dynamicLabels, setDynamicLabels] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    // Load dynamic labels for IDs in the URL
     async function loadDynamicData() {
       if (params.id && typeof params.id === "string") {
         if (pathname.includes("/admin/volunteers/")) {
-          console.log("[v0] Breadcrumb: Loading email for volunteer ID:", params.id)
-          const { data, error } = await supabase.from("profiles").select("email, name").eq("id", params.id).single()
-          console.log("[v0] Breadcrumb: Query result:", { data, error })
+          const result = await getUserProfile(params.id as string)
           
-          if (data?.email) {
-            setDynamicLabels((prev) => ({ ...prev, [params.id as string]: data.email }))
-          } else if (data?.name) {
-            // Fallback to name if email is not available
-            setDynamicLabels((prev) => ({ ...prev, [params.id as string]: data.name }))
+          if (result.success && result.profile) {
+            // Prefer email, fallback to name
+            const label = result.profile.email || result.profile.name || params.id as string
+            setDynamicLabels((prev) => ({ ...prev, [params.id as string]: label }))
           }
         }
       }
