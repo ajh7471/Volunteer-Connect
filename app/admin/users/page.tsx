@@ -171,8 +171,9 @@ export default function AdminUsersPage() {
       setBlockEmail("")
       setBlockReason("")
       loadBlockedEmails()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to block email")
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to block email"
+      toast.error(errorMessage)
     }
   }
 

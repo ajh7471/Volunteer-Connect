@@ -8,7 +8,24 @@ import { SendGridForm } from "./sendgrid-form"
 import { GmailForm } from "./gmail-form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-function EmailServiceConfigurations({ configs }: { configs: any[] }) {
+interface EmailServiceConfig {
+  id: string
+  service_name: "sendgrid" | "gmail"
+  is_active: boolean
+  is_validated?: boolean
+  priority: number
+  sendgrid_api_key?: string
+  sendgrid_from_email?: string
+  sendgrid_from_name?: string
+  gmail_client_id?: string
+  gmail_client_secret?: string
+  gmail_refresh_token?: string
+  gmail_from_email?: string
+  created_at?: string
+  updated_at?: string
+}
+
+function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[] }) {
   const sendgridConfig = configs.find((c) => c.service_name === "sendgrid")
   const gmailConfig = configs.find((c) => c.service_name === "gmail")
 

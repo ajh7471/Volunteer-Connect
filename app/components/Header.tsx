@@ -53,13 +53,14 @@ export default function Header() {
       }
 
       window.location.href = "/"
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
       console.error("Sign out error:", error)
       setSigningOut(false)
       
       toast({
         title: "Sign out failed",
-        description: error?.message || "Unable to sign out. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     }

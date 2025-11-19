@@ -12,6 +12,7 @@
 
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
+import { Role } from "@/types/database"
 
 /**
  * Creates a Supabase client with service role privileges
@@ -167,7 +168,7 @@ export async function deleteUserAccount(userId: string) {
     data: { user: currentUser },
   } = await userClient.auth.getUser()
 
-  if (currentUser?.id === userId) {
+  if (currentUser && currentUser.id === userId) {
     return { success: false, error: "Cannot delete your own account" }
   }
 
@@ -175,7 +176,7 @@ export async function deleteUserAccount(userId: string) {
 
   const { data: userToDelete } = await supabase.from("profiles").select("role").eq("id", userId).single()
 
-  if (userToDelete?.role === "admin" && admins && admins.length <= 1) {
+  if (userToDelete && userToDelete.role === "admin" && admins && admins.length <= 1) {
     return { success: false, error: "Cannot delete the last admin account" }
   }
 
@@ -207,7 +208,7 @@ export async function deleteUserAccount(userId: string) {
  * @param newRole The new role to assign
  * @returns Success status or error message
  */
-export async function updateUserRole(userId: string, newRole: "volunteer" | "admin") {
+export async function updateUserRole(userId: string, newRole: Role) {
   const { isAdmin, error: authError } = await verifyAdminRole()
   if (!isAdmin) {
     return { success: false, error: authError || "Unauthorized" }
@@ -217,11 +218,10 @@ export async function updateUserRole(userId: string, newRole: "volunteer" | "adm
 
   const { data: currentProfile } = await supabase.from("profiles").select("role").eq("id", userId).single()
 
-  if (currentProfile?.role === "admin" && newRole === "volunteer") {
+  if (currentProfile && currentProfile.role === "admin" && newRole === "volunteer") {
     const { data: admins } = await supabase.from("profiles").select("id").eq("role", "admin")
-
     if (admins && admins.length <= 1) {
-      return { success: false, error: "Cannot demote the last admin account" }
+      return { success: false, error: "Cannot change role: You are the last admin" }
     }
   }
 

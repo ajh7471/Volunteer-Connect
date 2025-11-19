@@ -20,6 +20,12 @@ interface EmailServiceConfig {
   gmail_client_secret?: string
   gmail_refresh_token?: string
   gmail_from_email?: string
+  is_validated?: boolean
+  last_validated_at?: string
+  validation_error?: string
+  gmail_access_token?: string
+  gmail_token_expiry?: string
+  created_by?: string
 }
 
 /**
@@ -222,19 +228,20 @@ export async function validateSendGridConfig(configId: string) {
     } else {
       throw new Error("SendGrid validation failed")
     }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     // Update validation error
     await supabase
       .from("email_service_config")
       .update({
         is_validated: false,
         last_validated_at: new Date().toISOString(),
-        validation_error: error.message,
+        validation_error: errorMessage,
       })
       .eq("id", configId)
 
     revalidatePath("/admin/settings/email-service")
-    throw new Error(`Validation failed: ${error.message}`)
+    throw new Error(`Validation failed: ${errorMessage}`)
   }
 }
 
@@ -302,18 +309,19 @@ export async function validateGmailConfig(configId: string) {
     } else {
       throw new Error("Gmail validation failed")
     }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     await supabase
       .from("email_service_config")
       .update({
         is_validated: false,
         last_validated_at: new Date().toISOString(),
-        validation_error: error.message,
+        validation_error: errorMessage,
       })
       .eq("id", configId)
 
     revalidatePath("/admin/settings/email-service")
-    throw new Error(`Validation failed: ${error.message}`)
+    throw new Error(`Validation failed: ${errorMessage}`)
   }
 }
 
