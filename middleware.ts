@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({
             request,
           })
@@ -31,16 +31,14 @@ export async function middleware(request: NextRequest) {
   try {
     const { data } = await supabase.auth.getUser()
     user = data.user
-  } catch (error: unknown) {
-    // If we get a session error (403), treat it as no user
-    // This happens during sign-out when cookies are in transition
+  } catch (error) {
     user = null
   }
 
   // Protect admin routes
   if (request.nextUrl.pathname.startsWith("/admin")) {
     if (!user) {
-      return NextResponse.redirect(new URL("/auth/login", request.url))
+      return NextResponse.redirect(new URL("/", request.url))
     }
 
     // Check admin role
@@ -54,7 +52,7 @@ export async function middleware(request: NextRequest) {
   const protectedRoutes = ["/calendar", "/my-schedule", "/profile", "/volunteer"]
   if (protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))) {
     if (!user) {
-      return NextResponse.redirect(new URL("/auth/login", request.url))
+      return NextResponse.redirect(new URL("/", request.url))
     }
   }
 
