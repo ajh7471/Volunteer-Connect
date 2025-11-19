@@ -463,7 +463,7 @@ export default function CalendarPage() {
                                   .eq("shift_id", shift.id)
                                   .eq("user_id", userId!)
                                   .single()
-                                  .then(({ data }) => {
+                                  .then(({ data }: { data: { id: string } | null }) => {
                                     if (data) handleCancel(data.id)
                                   })
                               }}
