@@ -104,7 +104,7 @@ export default function ReportsPage() {
       if (activityRes.status === "fulfilled" && activityRes.value.success) {
         setRecentActivity(activityRes.value.data || [])
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("[v0] Error loading report data:", error)
     } finally {
       setLoading(false)

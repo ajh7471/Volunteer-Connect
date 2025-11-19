@@ -116,8 +116,8 @@ export default function CalendarPage() {
     const attendeesList =
       !error && data
         ? (data as AssignmentWithRelations[])
-            .filter((a) => a.profiles?.name)
-            .map((a) => ({
+            .filter((a: AssignmentWithRelations) => a.profiles?.name)
+            .map((a: AssignmentWithRelations) => ({
               name: a.profiles?.name || 'Unknown',
               id: a.profiles?.id || '',
             }))
