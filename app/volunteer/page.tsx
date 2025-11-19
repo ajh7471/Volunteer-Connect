@@ -18,6 +18,17 @@ type UpcomingShift = {
   slot: string
 }
 
+type AssignmentData = {
+  id: string
+  shift_id: string
+  shifts: {
+    shift_date: string
+    start_time: string
+    end_time: string
+    slot: string
+  } | null
+}
+
 export default function VolunteerDashboard() {
   const [loading, setLoading] = useState(true)
   const [upcomingShifts, setUpcomingShifts] = useState<UpcomingShift[]>([])
@@ -70,7 +81,7 @@ export default function VolunteerDashboard() {
     const upcoming: UpcomingShift[] = []
 
     if (assignments && assignments.length > 0) {
-      assignments.forEach((assignment: any) => {
+      assignments.forEach((assignment: AssignmentData) => {
         if (!assignment.shifts) {
           return
         }
