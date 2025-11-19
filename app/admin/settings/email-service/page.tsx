@@ -205,7 +205,7 @@ export default function EmailServicePage() {
 
   useEffect(() => {
     const fetchConfigs = async () => {
-      const { data } = await supabase.from('email_service_configs').select('*')
+      const { data } = await supabase.from('email_service_config').select('*')
       setConfigs(data || [])
     }
 
