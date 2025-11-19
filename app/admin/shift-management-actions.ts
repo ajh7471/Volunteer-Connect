@@ -226,12 +226,20 @@ export async function leaveWaitlist(waitlistId: string) {
 
   if (error) return { success: false, error: error.message }
 
-  // Update positions for remaining waitlist
-  await supabase
+  const { data: affectedEntries } = await supabase
     .from("shift_waitlist")
-    .update({ position: supabase.raw("position - 1") })
+    .select("id, position")
     .eq("shift_id", entry.shift_id)
     .gt("position", entry.position)
+
+  if (affectedEntries && affectedEntries.length > 0) {
+    for (const waitlistEntry of affectedEntries) {
+      await supabase
+        .from("shift_waitlist")
+        .update({ position: waitlistEntry.position - 1 })
+        .eq("id", waitlistEntry.id)
+    }
+  }
 
   revalidatePath("/calendar")
   revalidatePath("/my-schedule")
