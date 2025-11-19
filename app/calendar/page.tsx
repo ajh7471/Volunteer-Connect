@@ -118,8 +118,8 @@ export default function CalendarPage() {
         ? (data as AssignmentWithRelations[])
             .filter((a) => a.profiles?.name)
             .map((a) => ({
-              name: a.profiles!.name,
-              id: a.profiles!.id,
+              name: a.profiles?.name || 'Unknown',
+              id: a.profiles?.id || '',
             }))
         : []
 

@@ -51,8 +51,8 @@ export interface ShiftWithRelations extends Shift {
 }
 
 export interface AssignmentWithRelations extends ShiftAssignment {
-  shifts?: Shift
-  profiles?: Profile
+  shifts?: Shift | null
+  profiles?: Profile | null
 }
 
 export interface EmailLog {
@@ -197,4 +197,63 @@ export interface EmailFilterCriteria {
   email_opt_in?: boolean
   email_categories?: string[]
   active?: boolean
+}
+
+export interface CalendarExport {
+  id: string
+  user_id: string
+  export_type: string
+  shift_ids: string[]
+  exported_at: string
+  ip_address: string | null
+  user_agent: string | null
+}
+
+export interface AuthBlocklist {
+  email: string
+  blocked_at: string
+  blocked_by: string
+  reason: string
+}
+
+export interface NotificationQueue {
+  id: string
+  user_id: string
+  notification_type: string
+  subject: string
+  body: string
+  status: string
+  scheduled_for: string
+  sent_at: string | null
+  retry_count: number
+  error_message: string | null
+  shift_id: string | null
+  email_log_id: string | null
+  created_at: string
+}
+
+export interface ScheduledEmail {
+  id: string
+  email_type: string
+  subject: string
+  body: string
+  recipients: Record<string, unknown>
+  filter_criteria: Record<string, unknown> | null
+  template_id: string | null
+  status: string
+  scheduled_for: string
+  sent_at: string | null
+  error_message: string | null
+  created_by: string
+  created_at: string
+}
+
+export interface PwaInstallation {
+  id: string
+  user_id: string
+  platform: string | null
+  device_type: string | null
+  installed_at: string
+  last_opened_at: string | null
+  is_active: boolean
 }

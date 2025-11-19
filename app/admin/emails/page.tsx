@@ -40,6 +40,14 @@ type Volunteer = {
   email_categories: Record<string, boolean> | null
 }
 
+type Profile = {
+  id: string
+  name: string
+  email_opt_in: boolean
+  email_categories: Record<string, boolean> | null
+  email?: string
+}
+
 export default function AdminEmailsPage() {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([])
@@ -61,11 +69,11 @@ export default function AdminEmailsPage() {
 
     if (profiles) {
       const enrichedVolunteers = await Promise.all(
-        profiles.map(async (profile: { id: string; name: string; email_opt_in: boolean; email_categories: Record<string, boolean> | null }) => {
+        profiles.map(async (profile: Profile) => {
           const { data } = await supabase.auth.admin.getUserById(profile.id)
           return {
             ...profile,
-            email: data.user?.email || "",
+            email: data.user?.email || profile.email || "",
           }
         }),
       )

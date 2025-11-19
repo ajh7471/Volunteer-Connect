@@ -44,7 +44,8 @@ type TeamMember = {
 }
 
 export default function MySchedulePage() {
-  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [upcoming, setUpcoming] = useState<Assignment[]>([])
+  const [past, setPast] = useState<Assignment[]>([])
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
@@ -111,19 +112,34 @@ export default function MySchedulePage() {
       console.error("[v0] Error loading assignments:", assignmentsResult.error)
       toast.error("Failed to load your schedule")
     } else {
-      const formatted = ((assignmentsResult.data || []) as AssignmentWithRelations[])
+      const assignmentsData = assignmentsResult.data || []
+
+      const upcomingAssignments = assignmentsData
         .filter((a) => a.shifts && a.shifts.shift_date && a.shifts.shift_date >= today)
         .map((a) => ({
           id: a.id,
           shift_id: a.shift_id,
-          shift_date: a.shifts!.shift_date,
-          slot: a.shifts!.slot,
-          start_time: a.shifts!.start_time,
-          end_time: a.shifts!.end_time,
+          shift_date: a.shifts?.shift_date || '',
+          slot: a.shifts?.slot || 'AM',
+          start_time: a.shifts?.start_time || '',
+          end_time: a.shifts?.end_time || '',
         }))
         .sort((a: Assignment, b: Assignment) => a.shift_date.localeCompare(b.shift_date))
 
-      setAssignments(formatted)
+      const pastAssignments = assignmentsData
+        .filter((a) => a.shifts && a.shifts.shift_date && a.shifts.shift_date < today)
+        .map((a) => ({
+          id: a.id,
+          shift_id: a.shift_id,
+          shift_date: a.shifts?.shift_date || '',
+          slot: a.shifts?.slot || 'AM',
+          start_time: a.shifts?.start_time || '',
+          end_time: a.shifts?.end_time || '',
+        }))
+        .sort((a: Assignment, b: Assignment) => b.shift_date.localeCompare(a.shift_date))
+
+      setUpcoming(upcomingAssignments)
+      setPast(pastAssignments)
     }
 
     // Process Waitlist
@@ -218,7 +234,7 @@ export default function MySchedulePage() {
   }
 
   async function handleAddAllToCalendar() {
-    const events: CalendarEvent[] = assignments.map((assignment: Assignment) => {
+    const events: CalendarEvent[] = upcoming.map((assignment: Assignment) => {
       const shiftDate = parseDate(assignment.shift_date)
       const [startHour, startMin] = assignment.start_time.split(":").map(Number)
       const [endHour, endMin] = assignment.end_time.split(":").map(Number)
@@ -269,21 +285,21 @@ export default function MySchedulePage() {
       .eq("shift_id", shiftId)
       .neq("user_id", userId!) // Exclude current user
 
-    const members =
+    const teamMembers =
       !error && data
-        ? (data as AssignmentWithRelations[])
-            .filter((a) => a.profiles)
+        ? data
+            .filter((a) => a.profiles && a.id !== shiftId)
             .map((a) => ({
-              id: a.profiles!.id,
-              name: a.profiles!.name || "Anonymous",
-              email: a.profiles!.email || "",
-              phone: a.profiles!.phone,
+              id: a.profiles?.id || '',
+              name: a.profiles?.name || "Anonymous",
+              email: a.profiles?.email || "",
+              phone: a.profiles?.phone || null,
             }))
         : []
 
     setShiftTeamMembers((prev) => ({
       ...prev,
-      [shiftId]: members,
+      [shiftId]: teamMembers,
     }))
 
     setLoadingTeamMembers((prev) => {
@@ -313,7 +329,7 @@ export default function MySchedulePage() {
             <p className="text-muted-foreground">View and manage your upcoming shifts</p>
           </div>
           <div className="flex gap-2">
-            {assignments.length > 0 && (
+            {upcoming.length > 0 && (
               <Button variant="outline" onClick={handleAddAllToCalendar}>
                 <CalendarPlus className="mr-2 h-4 w-4" />
                 Add All to Calendar
@@ -379,8 +395,8 @@ export default function MySchedulePage() {
           </Card>
         )}
 
-        {/* Assignments List */}
-        {assignments.length === 0 ? (
+        {/* Upcoming Assignments List */}
+        {upcoming.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
@@ -393,7 +409,7 @@ export default function MySchedulePage() {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {assignments.map((assignment: Assignment) => {
+            {upcoming.map((assignment: Assignment) => {
               const date = parseDate(assignment.shift_date)
               const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
               const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
@@ -489,6 +505,46 @@ export default function MySchedulePage() {
                 </Card>
               )
             })}
+          </div>
+        )}
+
+        {/* Past Assignments List */}
+        {past.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-2xl font-bold tracking-tight">Past Shifts</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {past.map((assignment: Assignment) => {
+                const date = parseDate(assignment.shift_date)
+                const dayOfWeek = date.toLocaleDateString("default", { weekday: "long" })
+                const monthDay = date.toLocaleDateString("default", { month: "short", day: "numeric" })
+
+                return (
+                  <Card key={assignment.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{dayOfWeek}</CardTitle>
+                          <CardDescription>{monthDay}</CardDescription>
+                        </div>
+                        <Badge>
+                          {assignment.slot === "AM" && "Morning"}
+                          {assignment.slot === "MID" && "Midday"}
+                          {assignment.slot === "PM" && "Afternoon"}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          {formatTime12Hour(assignment.start_time)} - {formatTime12Hour(assignment.end_time)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
