@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabaseClient"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,24 +11,13 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Download, AlertCircle, RefreshCw } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
-type Volunteer = {
-  id: string
-  name: string | null
-  phone: string | null
-  role: string | null
-  email: string | null
-  created_at: string
-  active: boolean | null
-  has_profile: boolean
-  auth_email?: string
-}
+import { getAllVolunteers, syncMissingProfiles, type VolunteerData } from "./volunteers-actions"
 
 export default function VolunteersPage() {
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [volunteers, setVolunteers] = useState<VolunteerData[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("active")
   const [missingProfiles, setMissingProfiles] = useState<number>(0)
   const [syncing, setSyncing] = useState(false)
 
@@ -39,174 +27,53 @@ export default function VolunteersPage() {
 
   async function loadVolunteers() {
     setLoading(true)
-    
+
     try {
-      console.log("[v0] Loading volunteers with filter:", statusFilter)
+      const result = await getAllVolunteers(statusFilter)
+      setVolunteers(result.volunteers)
+      setMissingProfiles(result.missingProfiles)
       
-      // Fetch all profiles
-      let profileQuery = supabase.from("profiles").select("*").order("name", { ascending: true })
-
-      if (statusFilter === "active") {
-        profileQuery = profileQuery.or("active.is.null,active.eq.true")
-      } else if (statusFilter === "inactive") {
-        profileQuery = profileQuery.eq("active", false)
-      }
-
-      const { data: profilesData, error: profilesError } = await profileQuery
-
-      if (profilesError) {
-        console.error("[v0] Profiles fetch error:", profilesError)
-      }
-
-      console.log("[v0] Profiles fetched:", profilesData?.length || 0)
-      console.log("[v0] Sample profile data:", profilesData?.[0])
-
-      // Fetch all auth users to compare
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers()
-
-      if (authError) {
-        console.error("[v0] Auth users fetch error:", authError)
-      }
-
-      console.log("[v0] Auth users count:", authData?.users?.length || 0)
-      console.log("[v0] Sample auth user:", authData?.users?.[0])
-
-      // Create a map of profiles by user ID
-      const profilesMap = new Map((profilesData || []).map((p: Volunteer) => [p.id, p]))
-
-      // Merge auth users with profiles
-      const allUsers: Volunteer[] = []
-      let missingProfileCount = 0
-
-      if (authData?.users) {
-        for (const authUser of authData.users) {
-          const profile = profilesMap.get(authUser.id)
-          
-          if (profile) {
-            // User has a profile
-            allUsers.push({
-              ...profile,
-              has_profile: true,
-              auth_email: authUser.email
-            })
-            profilesMap.delete(authUser.id) // Remove from map so we don't duplicate
-          } else {
-            // User exists in auth but has no profile
-            missingProfileCount++
-            allUsers.push({
-              id: authUser.id,
-              name: authUser.user_metadata?.name || null,
-              phone: authUser.user_metadata?.phone || null,
-              role: 'volunteer',
-              email: authUser.email || null,
-              created_at: authUser.created_at,
-              active: true,
-              has_profile: false,
-              auth_email: authUser.email
-            })
-          }
-        }
-      }
-
-      // Add any remaining profiles that don't have auth users (shouldn't happen but handle it)
-      profilesMap.forEach((profile) => {
-        allUsers.push({
-          ...profile,
-          has_profile: true
-        })
-      })
-
-      console.log("[v0] Missing profiles:", missingProfileCount)
-      console.log("[v0] Total users displayed:", allUsers.length)
-      console.log("[v0] User emails:", allUsers.map(u => u.email || u.auth_email))
-
-      setMissingProfiles(missingProfileCount)
-      setVolunteers(allUsers)
+      console.log("[v0] Client: Loaded volunteers:", result.volunteers.length)
+      console.log("[v0] Client: Volunteer emails:", result.volunteers.map(v => v.email || v.auth_email))
     } catch (err) {
-      console.error("[v0] Load volunteers error:", err)
+      console.error("[v0] Client: Load volunteers error:", err)
     } finally {
       setLoading(false)
     }
   }
 
-  async function syncMissingProfiles() {
+  async function handleSyncProfiles() {
     setSyncing(true)
-    
+
     try {
-      // Fetch all auth users
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers()
-      
-      if (authError) throw authError
-      
-      if (!authData?.users) {
-        throw new Error("No auth users found")
+      const result = await syncMissingProfiles()
+      alert(result.message)
+
+      if (result.count > 0) {
+        await loadVolunteers()
       }
-
-      // Fetch existing profiles
-      const { data: existingProfiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id")
-      
-      if (profilesError) throw profilesError
-
-      const existingProfileIds = new Set((existingProfiles || []).map((p: { id: string }) => p.id))
-
-      // Find users without profiles
-      const usersWithoutProfiles = authData.users.filter(
-        (user) => !existingProfileIds.has(user.id)
-      )
-
-      console.log("[v0] Users without profiles:", usersWithoutProfiles.length)
-
-      if (usersWithoutProfiles.length === 0) {
-        alert("All users already have profiles!")
-        return
-      }
-
-      // Create profiles for users without them
-      const newProfiles = usersWithoutProfiles.map((user) => ({
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
-        phone: user.user_metadata?.phone || null,
-        role: 'volunteer',
-        active: true,
-        email_opt_in: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }))
-
-      const { error: insertError } = await supabase
-        .from("profiles")
-        .insert(newProfiles)
-
-      if (insertError) throw insertError
-
-      alert(`Successfully created ${newProfiles.length} missing profile(s)!`)
-      
-      // Reload volunteers
-      await loadVolunteers()
     } catch (err) {
-      console.error("[v0] Sync error:", err)
-      alert(`Failed to sync profiles: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      console.error("[v0] Client: Sync error:", err)
+      alert(`Failed to sync profiles: ${err instanceof Error ? err.message : "Unknown error"}`)
     } finally {
       setSyncing(false)
     }
   }
 
-  const filtered = volunteers.filter((v: Volunteer) => {
+  const filtered = volunteers.filter((v: VolunteerData) => {
     const q = search.toLowerCase()
     return (
       (v.name || "").toLowerCase().includes(q) ||
       (v.phone || "").toLowerCase().includes(q) ||
       (v.email || "").toLowerCase().includes(q) ||
+      (v.auth_email || "").toLowerCase().includes(q) ||
       v.id.toLowerCase().includes(q)
     )
   })
 
   function exportToCSV() {
     const headers = ["Name", "Email", "Phone", "Role", "Status", "Has Profile", "Joined"]
-    const rows = filtered.map((v: Volunteer) => [
+    const rows = filtered.map((v: VolunteerData) => [
       v.name || "Unnamed",
       v.email || v.auth_email || "",
       v.phone || "",
@@ -252,14 +119,14 @@ export default function VolunteersPage() {
               <span>
                 Found {missingProfiles} user(s) without profiles. These users exist in authentication but don't have complete profile records.
               </span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={syncMissingProfiles}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncProfiles}
                 disabled={syncing}
               >
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Syncing...' : 'Sync Profiles'}
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing..." : "Sync Profiles"}
               </Button>
             </AlertDescription>
           </Alert>
@@ -312,7 +179,7 @@ export default function VolunteersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((v: Volunteer) => (
+                    {filtered.map((v: VolunteerData) => (
                       <TableRow key={v.id} className={!v.has_profile ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
                         <TableCell className="font-medium">{v.name || "Unnamed"}</TableCell>
                         <TableCell>{v.email || v.auth_email || "No email"}</TableCell>
