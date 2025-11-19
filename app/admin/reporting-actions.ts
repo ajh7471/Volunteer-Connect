@@ -107,7 +107,7 @@ export async function getVolunteerAttendance(
     if (error) throw error
 
     return { success: true, data: data as AttendanceRecord[] }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get volunteer attendance error:", error)
     return { success: false, error: errorMessage }
@@ -138,7 +138,7 @@ export async function calculateVolunteerHours(
       success: true,
       data: data[0] || { total_hours: 0, shift_count: 0, hours_breakdown: [] },
     }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Calculate volunteer hours error:", error)
     return { success: false, error: errorMessage }
@@ -171,7 +171,7 @@ export async function getShiftFillRates(
     if (error) throw error
 
     return { success: true, data: data as ShiftFillRate[] }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get shift fill rates error:", error)
     return { success: false, error: errorMessage }
@@ -197,7 +197,7 @@ export async function getShiftStatistics(
     if (error) throw error
 
     return { success: true, data: data[0] || null }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get shift statistics error:", error)
     return { success: false, error: errorMessage }
@@ -226,7 +226,7 @@ export async function getPopularTimeSlots(): Promise<{
     if (error) throw error
 
     return { success: true, data: data || [] }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get popular time slots error:", error)
     return { success: false, error: errorMessage }
@@ -276,7 +276,7 @@ export async function exportVolunteersCSV(): Promise<{
     const csv = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
 
     return { success: true, csv }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Export volunteers CSV error:", error)
     return { success: false, error: errorMessage }
@@ -318,7 +318,7 @@ export async function exportShiftReportCSV(
     const csv = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
 
     return { success: true, csv }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Export shift report CSV error:", error)
     return { success: false, error: errorMessage }
@@ -366,7 +366,7 @@ export async function exportAttendanceCSV(
     const csv = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n")
 
     return { success: true, csv }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Export attendance CSV error:", error)
     return { success: false, error: errorMessage }
@@ -414,7 +414,7 @@ export async function getDashboardStats(): Promise<{
         activeThisMonth: activeResult.data?.length || 0,
       },
     }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get dashboard stats error:", error)
     return { success: false, error: errorMessage }
@@ -460,7 +460,7 @@ export async function getRecentActivity(limit = 10): Promise<{
           created_at: item.signed_up_at,
         })) || [],
     }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     console.error("[v0] Get recent activity error:", error)
     return { success: false, error: errorMessage }
