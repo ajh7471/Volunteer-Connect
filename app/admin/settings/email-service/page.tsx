@@ -3,13 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getEmailServiceConfigs } from "@/app/admin/email-service-actions"
-import { AlertCircle, CheckCircle2, Mail, Settings } from "lucide-react"
+import { AlertCircle, CheckCircle2, Mail, Settings } from 'lucide-react'
 import { SendGridForm } from "./sendgrid-form"
 import { GmailForm } from "./gmail-form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-async function EmailServiceConfigurations() {
-  const configs = await getEmailServiceConfigs()
+function EmailServiceConfigurations({ configs }: { configs: any[] }) {
   const sendgridConfig = configs.find((c) => c.service_name === "sendgrid")
   const gmailConfig = configs.find((c) => c.service_name === "gmail")
 
@@ -150,6 +149,8 @@ async function EmailServiceConfigurations() {
 }
 
 export default async function EmailServicePage() {
+  const configs = await getEmailServiceConfigs()
+
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <div className="mb-8">
@@ -159,9 +160,7 @@ export default async function EmailServicePage() {
         </p>
       </div>
 
-      <Suspense fallback={<div>Loading configurations...</div>}>
-        <EmailServiceConfigurations />
-      </Suspense>
+      <EmailServiceConfigurations configs={configs} />
     </div>
   )
 }
