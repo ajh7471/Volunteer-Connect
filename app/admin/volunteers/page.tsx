@@ -29,7 +29,7 @@ export default function VolunteersPage() {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>("active")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [missingProfiles, setMissingProfiles] = useState<number>(0)
   const [syncing, setSyncing] = useState(false)
 
@@ -41,6 +41,8 @@ export default function VolunteersPage() {
     setLoading(true)
     
     try {
+      console.log("[v0] Loading volunteers with filter:", statusFilter)
+      
       // Fetch all profiles
       let profileQuery = supabase.from("profiles").select("*").order("name", { ascending: true })
 
@@ -56,6 +58,9 @@ export default function VolunteersPage() {
         console.error("[v0] Profiles fetch error:", profilesError)
       }
 
+      console.log("[v0] Profiles fetched:", profilesData?.length || 0)
+      console.log("[v0] Sample profile data:", profilesData?.[0])
+
       // Fetch all auth users to compare
       const { data: authData, error: authError } = await supabase.auth.admin.listUsers()
 
@@ -63,8 +68,8 @@ export default function VolunteersPage() {
         console.error("[v0] Auth users fetch error:", authError)
       }
 
-      console.log("[v0] Profiles count:", profilesData?.length || 0)
       console.log("[v0] Auth users count:", authData?.users?.length || 0)
+      console.log("[v0] Sample auth user:", authData?.users?.[0])
 
       // Create a map of profiles by user ID
       const profilesMap = new Map((profilesData || []).map((p: Volunteer) => [p.id, p]))
@@ -112,7 +117,8 @@ export default function VolunteersPage() {
       })
 
       console.log("[v0] Missing profiles:", missingProfileCount)
-      console.log("[v0] Total users:", allUsers.length)
+      console.log("[v0] Total users displayed:", allUsers.length)
+      console.log("[v0] User emails:", allUsers.map(u => u.email || u.auth_email))
 
       setMissingProfiles(missingProfileCount)
       setVolunteers(allUsers)
