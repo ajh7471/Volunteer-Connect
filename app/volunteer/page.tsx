@@ -111,7 +111,7 @@ export default function VolunteerDashboard() {
 
       upcoming.sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
-      const thisMonth = upcoming.filter((s) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth)
+      const thisMonth = upcoming.filter((s: UpcomingShift) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth)
 
       setUpcomingShifts(upcoming.slice(0, 3))
 

@@ -68,7 +68,7 @@ export default function AdminEmailsPage() {
     const { data: profiles } = await supabase.from("profiles").select("*").eq("email_opt_in", true).order("name")
 
     if (profiles) {
-      const enrichedVolunteers = await Promise.all(
+      const enrichedVolunteers: Volunteer[] = await Promise.all(
         profiles.map(async (profile: Profile) => {
           const { data } = await supabase.auth.admin.getUserById(profile.id)
           return {
@@ -77,7 +77,7 @@ export default function AdminEmailsPage() {
           }
         }),
       )
-      setVolunteers(enrichedVolunteers as Volunteer[])
+      setVolunteers(enrichedVolunteers)
     }
   }
 
@@ -138,7 +138,7 @@ export default function AdminEmailsPage() {
       const { data: authUser } = await supabase.auth.getUser()
 
       // Log email for each recipient
-      const emailPromises = selectedRecipients.map(async (recipientId: string) => {
+      const emailPromises: Promise<any>[] = selectedRecipients.map(async (recipientId: string) => {
         const volunteer = volunteers.find((v: Volunteer) => v.id === recipientId)
 
         return supabase.from("email_logs").insert({
