@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
 import { joinWaitlist } from "@/app/admin/shift-management-actions"
 import Link from "next/link"
+import { AssignmentWithRelations } from "@/types/database"
 
 export default function CalendarPage() {
   const router = useRouter()
@@ -114,11 +115,11 @@ export default function CalendarPage() {
 
     const attendeesList =
       !error && data
-        ? data
-            .filter((a: any) => a.profiles?.name)
-            .map((a: any) => ({
-              name: a.profiles.name,
-              id: a.profiles.id,
+        ? (data as AssignmentWithRelations[])
+            .filter((a) => a.profiles?.name)
+            .map((a) => ({
+              name: a.profiles!.name,
+              id: a.profiles!.id,
             }))
         : []
 

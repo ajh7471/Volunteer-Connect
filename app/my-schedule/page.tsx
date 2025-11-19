@@ -13,6 +13,7 @@ import Link from "next/link"
 import { generateICS, downloadICS, type CalendarEvent } from "@/lib/calendar-export"
 import { leaveWaitlist, acceptWaitlistSpot } from "@/app/admin/shift-management-actions"
 import { formatTime12Hour } from "@/lib/date"
+import { AssignmentWithRelations, Profile } from "@/types/database"
 
 type Assignment = {
   id: string
@@ -110,15 +111,15 @@ export default function MySchedulePage() {
       console.error("[v0] Error loading assignments:", assignmentsResult.error)
       toast.error("Failed to load your schedule")
     } else {
-      const formatted = (assignmentsResult.data || [])
-        .filter((a: any) => a.shifts?.shift_date >= today)
-        .map((a: any) => ({
+      const formatted = ((assignmentsResult.data || []) as AssignmentWithRelations[])
+        .filter((a) => a.shifts?.shift_date >= today)
+        .map((a) => ({
           id: a.id,
           shift_id: a.shift_id,
-          shift_date: a.shifts.shift_date,
-          slot: a.shifts.slot,
-          start_time: a.shifts.start_time,
-          end_time: a.shifts.end_time,
+          shift_date: a.shifts!.shift_date,
+          slot: a.shifts!.slot,
+          start_time: a.shifts!.start_time,
+          end_time: a.shifts!.end_time,
         }))
         .sort((a: Assignment, b: Assignment) => a.shift_date.localeCompare(b.shift_date))
 
@@ -127,9 +128,9 @@ export default function MySchedulePage() {
 
     // Process Waitlist
     if (waitlistResult.data) {
-      const formattedWaitlist = waitlistResult.data
-        .filter((w: any) => w.shifts?.shift_date >= today)
-        .map((w: any) => ({
+      const formattedWaitlist = (waitlistResult.data as any[])
+        .filter((w) => w.shifts?.shift_date >= today)
+        .map((w) => ({
           id: w.id,
           shift_id: w.shift_id,
           position: w.position,
@@ -270,13 +271,13 @@ export default function MySchedulePage() {
 
     const members =
       !error && data
-        ? data
-            .filter((a: any) => a.profiles)
-            .map((a: any) => ({
-              id: a.profiles.id,
-              name: a.profiles.name || "Anonymous",
-              email: a.profiles.email,
-              phone: a.profiles.phone,
+        ? (data as AssignmentWithRelations[])
+            .filter((a) => a.profiles)
+            .map((a) => ({
+              id: a.profiles!.id,
+              name: a.profiles!.name || "Anonymous",
+              email: a.profiles!.email || "",
+              phone: a.profiles!.phone,
             }))
         : []
 

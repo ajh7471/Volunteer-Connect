@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { PlusCircle, Calendar, Clock, Users } from 'lucide-react'
+import { ShiftTemplate } from "@/types/database"
 
 export default async function ShiftTemplatesPage() {
   const supabase = await createServerClient()
@@ -47,7 +48,7 @@ export default async function ShiftTemplatesPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {templates?.map((template: any) => (
+        {templates?.map((template: ShiftTemplate) => (
           <Card key={template.id} className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div>

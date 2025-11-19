@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { EmailFilterCriteria } from "@/types/database"
 
 /**
  * Send email to single or multiple recipients
@@ -168,7 +169,7 @@ export async function scheduleEmail(formData: {
   body: string
   scheduledFor: Date
   templateId?: string
-  filterCriteria?: any
+  filterCriteria?: EmailFilterCriteria
 }) {
   const supabase = await createClient()
 

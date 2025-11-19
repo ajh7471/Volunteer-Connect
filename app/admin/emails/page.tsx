@@ -37,7 +37,7 @@ type Volunteer = {
   name: string
   email: string
   email_opt_in: boolean
-  email_categories: any
+  email_categories: Record<string, boolean> | null
 }
 
 export default function AdminEmailsPage() {
@@ -61,7 +61,7 @@ export default function AdminEmailsPage() {
 
     if (profiles) {
       const enrichedVolunteers = await Promise.all(
-        profiles.map(async (profile: any) => {
+        profiles.map(async (profile: { id: string; name: string; email_opt_in: boolean; email_categories: Record<string, boolean> | null }) => {
           const { data } = await supabase.auth.admin.getUserById(profile.id)
           return {
             ...profile,
@@ -151,8 +151,9 @@ export default function AdminEmailsPage() {
       setSubject("")
       setMessage("")
       loadEmailLogs()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send emails")
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send emails"
+      toast.error(errorMessage)
     }
   }
 

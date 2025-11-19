@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient"
 import { ymd } from "./date"
+import { ShiftAssignment, AssignmentWithRelations } from "@/types/database"
 
 export type ShiftWithCapacity = {
   id: string
@@ -161,18 +162,18 @@ export async function getUserAssignments(
     return []
   }
 
-  return data
-    .filter((a: any) => {
+  return (data as AssignmentWithRelations[])
+    .filter((a) => {
       const date = a.shifts?.shift_date
       return date && date >= startDate && date <= endDate
     })
-    .map((a: any) => ({
+    .map((a) => ({
       id: a.id,
       shift_id: a.shift_id,
-      shift_date: a.shifts.shift_date,
-      slot: a.shifts.slot,
-      start_time: a.shifts.start_time,
-      end_time: a.shifts.end_time,
+      shift_date: a.shifts!.shift_date,
+      slot: a.shifts!.slot,
+      start_time: a.shifts!.start_time,
+      end_time: a.shifts!.end_time,
     }))
 }
 

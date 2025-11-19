@@ -20,13 +20,29 @@ import {
 } from "../reporting-actions"
 import Link from "next/link"
 
+type PopularSlot = {
+  slot: string
+  total_shifts: number
+  avg_fill_rate: number
+  total_volunteers: number
+}
+
+type RecentActivity = {
+  id: string
+  type: "signup" | "cancellation"
+  volunteer_name: string
+  shift_date: string
+  slot: string
+  created_at: string
+}
+
 export default function ReportsPage() {
   const router = useRouter()
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [dashboardStats, setDashboardStats] = useState<any>(null)
   const [shiftStats, setShiftStats] = useState<ShiftStatistics | null>(null)
-  const [popularSlots, setPopularSlots] = useState<any[]>([])
-  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [popularSlots, setPopularSlots] = useState<PopularSlot[]>([])
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
 
   // Check admin role
@@ -334,7 +350,7 @@ export default function ReportsPage() {
                 <CardContent>
                   {popularSlots.length > 0 ? (
                     <div className="space-y-3">
-                      {popularSlots.map((slot: any, idx: number) => (
+                      {popularSlots.map((slot: PopularSlot, idx: number) => (
                         <div key={idx} className="flex items-center justify-between">
                           <div>
                             <p className="font-medium">{slot.slot}</p>
@@ -367,7 +383,7 @@ export default function ReportsPage() {
               <CardContent>
                 {recentActivity.length > 0 ? (
                   <div className="space-y-3">
-                    {recentActivity.map((activity: any) => (
+                    {recentActivity.map((activity: RecentActivity) => (
                       <div key={activity.id} className="flex items-start justify-between border-b pb-3 last:border-0">
                         <div>
                           <p className="font-medium">{activity.volunteer_name}</p>

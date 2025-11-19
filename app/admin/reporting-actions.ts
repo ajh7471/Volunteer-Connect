@@ -16,6 +16,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { ShiftFillRate, VolunteerAttendance } from "@/types/database"
 
 // =====================================================
 // TYPES
@@ -31,20 +32,6 @@ export type AttendanceRecord = {
   slot: string
   status: "Completed" | "Today" | "Upcoming"
   hours: number
-}
-
-export type ShiftFillRate = {
-  shift_id: string
-  shift_date: string
-  start_time: string
-  end_time: string
-  slot: string
-  capacity: number
-  filled_count: number
-  fill_rate_percent: number
-  spots_remaining: number
-  fill_status: "Full" | "Partial" | "Empty"
-  volunteer_names: string | null
 }
 
 export type VolunteerHours = {
@@ -303,9 +290,8 @@ export async function exportShiftReportCSV(
 
     if (error) throw error
 
-    // Generate CSV
     const headers = ["Date", "Time Slot", "Capacity", "Filled", "Fill Rate %", "Status", "Volunteers"]
-    const rows = data.map((s: any) => [
+    const rows = (data as ShiftFillRate[]).map((s) => [
       new Date(s.shift_date).toLocaleDateString(),
       s.slot,
       s.capacity.toString(),
@@ -352,9 +338,8 @@ export async function exportAttendanceCSV(
 
     if (error) throw error
 
-    // Generate CSV
     const headers = ["Volunteer Name", "Email", "Shift Date", "Time Slot", "Status", "Hours"]
-    const rows = data.map((a: any) => [
+    const rows = (data as VolunteerAttendance[]).map((a) => [
       a.volunteer_name || "",
       a.volunteer_email || "",
       new Date(a.shift_date).toLocaleDateString(),
@@ -450,7 +435,7 @@ export async function getRecentActivity(limit = 10): Promise<{
     return {
       success: true,
       data:
-        data?.map((item: any) => ({
+        (data as VolunteerAttendance[])?.map((item) => ({
           id: item.assignment_id,
           type: "signup" as const,
           volunteer_name: item.volunteer_name,
