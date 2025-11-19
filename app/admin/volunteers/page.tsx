@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabaseClient"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,18 +10,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Download } from 'lucide-react'
+import { getAdminUsers } from "@/app/admin/actions"
 
-type Volunteer = {
+type VolunteerData = {
   id: string
   name: string | null
+  email: string | null
   phone: string | null
   role: string | null
-  created_at: string
   active: boolean | null
+  created_at: string
+  last_sign_in_at?: string
 }
 
 export default function VolunteersPage() {
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [volunteers, setVolunteers] = useState<VolunteerData[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("active")
@@ -33,39 +35,53 @@ export default function VolunteersPage() {
 
   async function loadVolunteers() {
     setLoading(true)
-    let query = supabase.from("profiles").select("*").order("name", { ascending: true })
 
-    if (statusFilter === "active") {
-      query = query.or("active.is.null,active.eq.true")
-    } else if (statusFilter === "inactive") {
-      query = query.eq("active", false)
+    try {
+      const result = await getAdminUsers()
+      
+      if (result.success && result.users) {
+        let filteredUsers = result.users
+        
+        // Apply status filter
+        if (statusFilter === "active") {
+          filteredUsers = filteredUsers.filter((u: VolunteerData) => u.active !== false)
+        } else if (statusFilter === "inactive") {
+          filteredUsers = filteredUsers.filter((u: VolunteerData) => u.active === false)
+        }
+        
+        setVolunteers(filteredUsers)
+        console.log("[v0] Client: Loaded volunteers:", filteredUsers.length)
+        console.log("[v0] Client: Volunteer emails:", filteredUsers.map((v: VolunteerData) => v.email))
+      } else {
+        console.error("[v0] Client: Failed to load volunteers:", result.error)
+      }
+    } catch (err) {
+      console.error("[v0] Client: Load volunteers error:", err)
+    } finally {
+      setLoading(false)
     }
-
-    const { data, error } = await query
-
-    if (!error && data) {
-      setVolunteers(data as Volunteer[])
-    }
-    setLoading(false)
   }
 
-  const filtered = volunteers.filter((v) => {
+  const filtered = volunteers.filter((v: VolunteerData) => {
     const q = search.toLowerCase()
     return (
       (v.name || "").toLowerCase().includes(q) ||
       (v.phone || "").toLowerCase().includes(q) ||
+      (v.email || "").toLowerCase().includes(q) ||
       v.id.toLowerCase().includes(q)
     )
   })
 
   function exportToCSV() {
-    const headers = ["Name", "Phone", "Role", "Status", "Joined"]
-    const rows = filtered.map((v: Volunteer) => [
+    const headers = ["Name", "Email", "Phone", "Role", "Status", "Joined", "Last Sign In"]
+    const rows = filtered.map((v: VolunteerData) => [
       v.name || "Unnamed",
+      v.email || "",
       v.phone || "",
       v.role || "volunteer",
       v.active === false ? "Inactive" : "Active",
       new Date(v.created_at).toLocaleDateString(),
+      v.last_sign_in_at ? new Date(v.last_sign_in_at).toLocaleDateString() : "Never",
     ])
 
     const csv = [headers, ...rows].map((row: (string | number)[]) => row.join(",")).join("\n")
@@ -107,7 +123,7 @@ export default function VolunteersPage() {
               <div className="flex flex-1 items-center gap-2">
                 <Search className="h-5 w-5 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, phone, or ID..."
+                  placeholder="Search by name, email, phone, or ID..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="max-w-sm"
@@ -134,17 +150,20 @@ export default function VolunteersPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Joined</TableHead>
+                      <TableHead>Last Sign In</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((v: Volunteer) => (
+                    {filtered.map((v: VolunteerData) => (
                       <TableRow key={v.id}>
                         <TableCell className="font-medium">{v.name || "Unnamed"}</TableCell>
+                        <TableCell>{v.email || "No email"}</TableCell>
                         <TableCell>{v.phone || "No phone"}</TableCell>
                         <TableCell>
                           <Badge variant={v.role === "admin" ? "default" : "secondary"}>{v.role || "volunteer"}</Badge>
@@ -155,6 +174,7 @@ export default function VolunteersPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{new Date(v.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{v.last_sign_in_at ? new Date(v.last_sign_in_at).toLocaleDateString() : "Never"}</TableCell>
                         <TableCell className="text-right">
                           <Button asChild variant="outline" size="sm">
                             <Link href={`/admin/volunteers/${v.id}`}>View</Link>
@@ -164,7 +184,7 @@ export default function VolunteersPage() {
                     ))}
                     {filtered.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground">
                           No volunteers found
                         </TableCell>
                       </TableRow>

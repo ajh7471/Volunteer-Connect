@@ -400,3 +400,54 @@ export async function getAdminUsers() {
 
   return { success: true, users: enrichedUsers }
 }
+
+/**
+ * GET SINGLE USER PROFILE WITH EMAIL
+ *
+ * Fetches a single user profile by ID with their email from auth.
+ * Uses service role to bypass RLS and get complete data.
+ *
+ * @test-scope: User management - single user fetch with email
+ * @param userId The UUID of the user to fetch
+ * @returns User profile with email or error
+ */
+export async function getUserProfile(userId: string) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) {
+    return { success: false, error: authError || "Unauthorized" }
+  }
+
+  const supabase = await getServiceRoleClient()
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single()
+
+  if (profileError || !profile) {
+    return { success: false, error: "Profile not found" }
+  }
+
+  // Fetch auth user to get email
+  const { data: authData, error: authError2 } = await supabase.auth.admin.getUserById(userId)
+
+  if (authError2 || !authData.user) {
+    return { 
+      success: true, 
+      profile: {
+        ...profile,
+        email: profile.email || "No email"
+      }
+    }
+  }
+
+  return {
+    success: true,
+    profile: {
+      ...profile,
+      email: authData.user.email || profile.email || "No email",
+      last_sign_in_at: authData.user.last_sign_in_at
+    }
+  }
+}

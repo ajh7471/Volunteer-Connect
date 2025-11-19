@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from "@/lib/supabaseClient"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { ToastManager } from "@/lib/toast"
+import { getUserProfile } from "@/app/admin/actions"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,10 +28,12 @@ import {
 type Profile = {
   id: string
   name: string | null
+  email: string | null
   phone: string | null
   role: string | null
   created_at: string
   active: boolean | null
+  last_sign_in_at?: string | null
 }
 
 type Assignment = {
@@ -63,15 +66,16 @@ export default function VolunteerProfilePage() {
   }, [id])
 
   async function loadProfile() {
-    const { data, error } = await supabase.from("profiles").select("*").eq("id", id).single()
+    const result = await getUserProfile(id)
 
-    if (error) {
-      setError("Failed to load profile")
-    } else if (data) {
-      setProfile(data as Profile)
-      setName(data.name || "")
-      setPhone(data.phone || "")
-      setRole(data.role || "volunteer")
+    if (!result.success || !result.profile) {
+      setError(result.error || "Failed to load profile")
+      setProfile(null)
+    } else {
+      setProfile(result.profile as Profile)
+      setName(result.profile.name || "")
+      setPhone(result.profile.phone || "")
+      setRole(result.profile.role || "volunteer")
     }
   }
 
@@ -143,10 +147,25 @@ export default function VolunteerProfilePage() {
     setLoading(false)
   }
 
-  if (!profile) {
+  if (!profile && !error) {
     return (
       <RequireAuth>
         <p className="text-center text-muted-foreground">Loading...</p>
+      </RequireAuth>
+    )
+  }
+
+  if (error && !profile) {
+    return (
+      <RequireAuth>
+        <div className="space-y-6">
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Button variant="outline" onClick={() => router.push("/admin/volunteers")}>
+            Back to List
+          </Button>
+        </div>
       </RequireAuth>
     )
   }
@@ -271,6 +290,14 @@ export default function VolunteerProfilePage() {
                   <div className="sm:col-span-2">
                     <Label className="text-muted-foreground">User ID</Label>
                     <p className="font-mono text-sm">{profile.id}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="text-muted-foreground">Email</Label>
+                    <p className="text-lg">{profile.email || "Not set"}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="text-muted-foreground">Last Sign In</Label>
+                    <p className="text-lg">{profile.last_sign_in_at ? new Date(profile.last_sign_in_at).toLocaleDateString() : "Not set"}</p>
                   </div>
                 </div>
               </>

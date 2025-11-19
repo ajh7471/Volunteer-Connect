@@ -47,13 +47,13 @@ export default function Header() {
         try {
           localStorage.removeItem('volunteer-hub-cache')
           sessionStorage.clear()
-        } catch (storageError: unknown) {
+        } catch (storageError) {
           console.error('Storage cleanup error:', storageError)
         }
       }
 
-      window.location.href = "/"
-    } catch (error: unknown) {
+      r.push("/")
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
       console.error("Sign out error:", error)
       setSigningOut(false)
@@ -70,7 +70,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-foreground">
+          <Link href={userId ? (role === "admin" ? "/admin" : "/volunteer") : "/"} className="text-xl font-bold text-foreground">
             Volunteer Hub
           </Link>
 
@@ -107,7 +107,7 @@ export default function Header() {
           </div>
 
           {/* Mobile Menu Button */}
-          <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>

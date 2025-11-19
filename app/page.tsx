@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from 'next/navigation'
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Info } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 
 export default function HomePage() {
   const router = useRouter()
@@ -18,6 +18,21 @@ export default function HomePage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.session.user.id).maybeSingle()
+        const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+        router.replace(destination)
+      } else {
+        setCheckingSession(false)
+      }
+    }
+    checkSession()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,20 +50,34 @@ export default function HomePage() {
         setError("Unable to sign in. Please check your email and password and try again.")
       }
       setLoading(false)
-    } else if (data.user) {
+      return
+    }
+    
+    if (data.user) {
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
 
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
       const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
-      window.location.href = destination
+      router.push(destination)
     }
   }
 
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-[calc(100vh-200px)] items-center justify-center py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30 px-4">
       <div className="w-full max-w-md space-y-6">
-        <Card className="w-full">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold tracking-tight">Volunteer Hub</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Coordinate volunteer shifts with ease</p>
+        </div>
+
+        <Card className="w-full shadow-lg">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
             <CardDescription>Sign in to access your volunteer dashboard</CardDescription>
@@ -82,6 +111,8 @@ export default function HomePage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="email"
+                  autoFocus
                 />
               </div>
 
@@ -94,6 +125,7 @@ export default function HomePage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="current-password"
                 />
               </div>
 

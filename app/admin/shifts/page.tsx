@@ -11,6 +11,7 @@ import { Calendar, Trash2, UserPlus, AlertCircle, Loader2 } from 'lucide-react'
 import { ymd, formatTime12Hour } from "@/lib/date"
 import Link from "next/link"
 import { toast } from "@/lib/toast"
+import { getAdminUsers } from "@/app/admin/actions"
 
 type Shift = {
   id: string
@@ -29,7 +30,7 @@ type Assignment = {
   profiles: {
     name: string | null
     phone: string | null
-  }
+  } | null // Allow profiles to be null
 }
 
 type Volunteer = {
@@ -55,6 +56,8 @@ export default function AdminShiftsPage() {
 
   async function loadData() {
     setLoading(true)
+    
+    console.log("[v0] Loading shifts for date:", selectedDate)
 
     const { data: shiftsData } = await supabase
       .from("shifts")
@@ -70,18 +73,14 @@ export default function AdminShiftsPage() {
 
       const shiftIds = sorted.map((s: Shift) => s.id)
       
-      const [assignResult, volResult] = await Promise.all([
+      const [assignResult, volunteersResult] = await Promise.all([
         shiftIds.length > 0 
           ? supabase
               .from("shift_assignments")
               .select("*, profiles(name, phone)")
               .in("shift_id", shiftIds)
           : Promise.resolve({ data: [] }),
-        supabase
-          .from("profiles")
-          .select("id, name, phone, active")
-          .or("active.is.null,active.eq.true")
-          .order("name", { ascending: true })
+        getAdminUsers()
       ])
 
       if (assignResult.data) {
@@ -95,21 +94,33 @@ export default function AdminShiftsPage() {
         setAssignments({})
       }
 
-      if (volResult.data) {
-        setVolunteers(volResult.data as Volunteer[])
+      if (volunteersResult.success && volunteersResult.users) {
+        const activeVolunteers = volunteersResult.users.filter(
+          (user: { role: string; active: boolean | null }) => 
+            user.role === 'volunteer' && (user.active === true || user.active === null)
+        )
+        console.log("[v0] Active volunteers loaded:", activeVolunteers.length)
+        setVolunteers(activeVolunteers as Volunteer[])
+      } else {
+        console.log("[v0] Failed to load volunteers:", volunteersResult.error)
+        setVolunteers([])
       }
     } else {
       setShifts([])
       setAssignments({})
       
-      const { data: volData } = await supabase
-        .from("profiles")
-        .select("id, name, phone, active")
-        .or("active.is.null,active.eq.true")
-        .order("name", { ascending: true })
-        
-      if (volData) {
-        setVolunteers(volData as Volunteer[])
+      const volunteersResult = await getAdminUsers()
+      
+      if (volunteersResult.success && volunteersResult.users) {
+        const activeVolunteers = volunteersResult.users.filter(
+          (user: { role: string; active: boolean | null }) => 
+            user.role === 'volunteer' && (user.active === true || user.active === null)
+        )
+        console.log("[v0] Active volunteers loaded (no shifts):", activeVolunteers.length)
+        setVolunteers(activeVolunteers as Volunteer[])
+      } else {
+        console.log("[v0] Failed to load volunteers (no shifts):", volunteersResult.error)
+        setVolunteers([])
       }
     }
 
@@ -317,13 +328,13 @@ export default function AdminShiftsPage() {
                             className="flex items-center justify-between rounded-lg border bg-card p-3"
                           >
                             <div>
-                              <p className="font-medium">{assignment.profiles.name || "Unnamed Volunteer"}</p>
-                              <p className="text-sm text-muted-foreground">{assignment.profiles.phone || "No phone"}</p>
+                              <p className="font-medium">{assignment.profiles?.name || "Unnamed Volunteer"}</p>
+                              <p className="text-sm text-muted-foreground">{assignment.profiles?.phone || "No phone"}</p>
                             </div>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => removeAssignment(assignment.id, assignment.profiles.name || "Unnamed")}
+                              onClick={() => removeAssignment(assignment.id, assignment.profiles?.name || "Unnamed")}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
