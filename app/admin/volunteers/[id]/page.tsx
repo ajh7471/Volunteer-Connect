@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from "@/lib/supabaseClient"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Button } from "@/components/ui/button"
@@ -58,20 +58,31 @@ export default function VolunteerProfilePage() {
   const [role, setRole] = useState("volunteer")
 
   useEffect(() => {
+    console.log("[v0] Volunteer Detail: Loading profile for ID:", id)
     loadProfile()
     loadAssignments()
   }, [id])
 
   async function loadProfile() {
+    console.log("[v0] Volunteer Detail: Fetching profile from database...")
     const { data, error } = await supabase.from("profiles").select("*").eq("id", id).single()
 
+    console.log("[v0] Volunteer Detail: Query result:", { data, error })
+
     if (error) {
+      console.error("[v0] Volunteer Detail: Error loading profile:", error)
       setError("Failed to load profile")
+      setProfile(null)
     } else if (data) {
+      console.log("[v0] Volunteer Detail: Profile loaded successfully:", data)
       setProfile(data as Profile)
       setName(data.name || "")
       setPhone(data.phone || "")
       setRole(data.role || "volunteer")
+    } else {
+      console.warn("[v0] Volunteer Detail: No profile data returned")
+      setError("Profile not found")
+      setProfile(null)
     }
   }
 
@@ -143,10 +154,25 @@ export default function VolunteerProfilePage() {
     setLoading(false)
   }
 
-  if (!profile) {
+  if (!profile && !error) {
     return (
       <RequireAuth>
         <p className="text-center text-muted-foreground">Loading...</p>
+      </RequireAuth>
+    )
+  }
+
+  if (error && !profile) {
+    return (
+      <RequireAuth>
+        <div className="space-y-6">
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Button variant="outline" onClick={() => router.push("/admin/volunteers")}>
+            Back to List
+          </Button>
+        </div>
       </RequireAuth>
     )
   }
