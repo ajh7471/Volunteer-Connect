@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/lib/toast"
-import { Mail, Send, Users } from "lucide-react"
+import { Mail, Send, Users } from 'lucide-react'
 
 type EmailLog = {
   id: string
@@ -61,7 +61,7 @@ export default function AdminEmailsPage() {
 
     if (profiles) {
       const enrichedVolunteers = await Promise.all(
-        profiles.map(async (profile) => {
+        profiles.map(async (profile: any) => {
           const { data } = await supabase.auth.admin.getUserById(profile.id)
           return {
             ...profile,
