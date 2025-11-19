@@ -26,9 +26,28 @@ interface EmailServiceConfig {
   updated_at?: string
 }
 
+type SendGridConfig = {
+  id: string
+  sendgrid_api_key: string
+  sendgrid_from_email: string
+  sendgrid_from_name: string
+  is_active: boolean
+  validation_error: string | null
+}
+
+type GmailConfig = {
+  id: string
+  gmail_client_id: string
+  gmail_client_secret: string
+  gmail_refresh_token: string
+  gmail_from_email: string
+  is_active: boolean
+  validation_error: string | null
+}
+
 function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[] }) {
-  const sendgridConfig = configs.find((c) => c.service_name === "sendgrid")
-  const gmailConfig = configs.find((c) => c.service_name === "gmail")
+  const sendgridConfig = configs.find((c) => c.service_name === "sendgrid" && c.sendgrid_api_key) as SendGridConfig | undefined
+  const gmailConfig = configs.find((c) => c.service_name === "gmail" && c.gmail_client_id) as GmailConfig | undefined
 
   return (
     <div className="space-y-6">
