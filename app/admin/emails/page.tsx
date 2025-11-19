@@ -159,7 +159,7 @@ export default function AdminEmailsPage() {
       setSubject("")
       setMessage("")
       loadEmailLogs()
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to send emails"
       toast.error(errorMessage)
     }

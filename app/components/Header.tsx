@@ -47,13 +47,13 @@ export default function Header() {
         try {
           localStorage.removeItem('volunteer-hub-cache')
           sessionStorage.clear()
-        } catch (storageError) {
+        } catch (storageError: unknown) {
           console.error('Storage cleanup error:', storageError)
         }
       }
 
       window.location.href = "/"
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
       console.error("Sign out error:", error)
       setSigningOut(false)
