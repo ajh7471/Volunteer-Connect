@@ -35,8 +35,18 @@ export async function middleware(request: NextRequest) {
     user = null
   }
 
+  const { pathname } = request.nextUrl
+
+  // Redirect authenticated users away from login pages
+  if (user && (pathname === "/" || pathname.startsWith("/auth"))) {
+    // Check role to determine destination
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+    return NextResponse.redirect(new URL(destination, request.url))
+  }
+
   // Protect admin routes
-  if (request.nextUrl.pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/admin")) {
     if (!user) {
       return NextResponse.redirect(new URL("/", request.url))
     }
@@ -50,20 +60,21 @@ export async function middleware(request: NextRequest) {
   }
 
   const protectedRoutes = ["/calendar", "/my-schedule", "/profile", "/volunteer"]
-  if (protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))) {
+  if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     if (!user) {
       return NextResponse.redirect(new URL("/", request.url))
     }
   }
 
   const securityHeaders = {
-    'X-Frame-Options': 'DENY',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'X-XSS-Protection': '1; mode=block',
-    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self' data:; connect-src 'self' https: wss:;",
-    'Permissions-Policy': "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-XSS-Protection": "1; mode=block",
+    "Content-Security-Policy":
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self' data:; connect-src 'self' https: wss:;",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   }
 
   Object.entries(securityHeaders).forEach(([key, value]) => {
@@ -74,5 +85,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/calendar/:path*", "/my-schedule/:path*", "/profile/:path*", "/volunteer/:path*"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - manifest.json (web manifest)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json).*)",
+  ],
 }

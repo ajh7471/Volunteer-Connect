@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from 'next/navigation'
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
@@ -18,6 +18,21 @@ export default function HomePage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.session.user.id).maybeSingle()
+        const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+        router.replace(destination)
+      } else {
+        setCheckingSession(false)
+      }
+    }
+    checkSession()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +59,14 @@ export default function HomePage() {
       const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
       router.push(destination)
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    )
   }
 
   return (

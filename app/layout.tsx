@@ -2,10 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import "./globals.css"
-import Header from "./components/Header"
 import ToastContainer from "./components/ToastContainer"
-import { BreadcrumbNav } from "@/components/breadcrumb-nav"
-import { usePathname } from 'next/navigation'
+import ClientLayout from "@/components/client-layout"
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -30,31 +28,6 @@ export const metadata: Metadata = {
   generator: "v0.app",
 }
 
-function LayoutContent({ children }: { children: React.ReactNode }) {
-  "use client"
-  
-  const pathname = usePathname()
-  
-  // Skip header and breadcrumb on authentication pages for faster load
-  const isAuthPage = pathname === "/" || pathname?.startsWith("/auth")
-  
-  if (isAuthPage) {
-    return <main className="min-h-dvh">{children}</main>
-  }
-  
-  return (
-    <>
-      <Header />
-      <div className="border-b bg-muted/30">
-        <div className="container mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
-          <BreadcrumbNav />
-        </div>
-      </div>
-      <main className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>
-    </>
-  )
-}
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -63,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${jetbrainsMono.variable} min-h-dvh bg-background font-sans antialiased`}>
-        <LayoutContent>{children}</LayoutContent>
+        <ClientLayout>{children}</ClientLayout>
         <ToastContainer />
       </body>
     </html>
