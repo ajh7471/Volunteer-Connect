@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle } from "lucide-react"
 
 export default function HomePage() {
   const router = useRouter()
@@ -19,19 +19,60 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
+  const sessionCheckCompleted = useRef(false)
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (data.session) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.session.user.id).maybeSingle()
-        const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
-        router.replace(destination)
-      } else {
+    let mounted = true
+
+    const checkTimeout = setTimeout(() => {
+      if (mounted && !sessionCheckCompleted.current) {
+        console.warn("[v0] Session check timeout - showing login")
         setCheckingSession(false)
       }
+    }, 2000)
+
+    const checkSession = async () => {
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession()
+
+        if (!mounted) return
+
+        if (sessionError || !data.session) {
+          sessionCheckCompleted.current = true
+          clearTimeout(checkTimeout)
+          setCheckingSession(false)
+          return
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.session.user.id)
+          .maybeSingle()
+
+        if (!mounted) return
+
+        sessionCheckCompleted.current = true
+        clearTimeout(checkTimeout)
+
+        const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+        router.replace(destination)
+      } catch (error) {
+        console.error("[v0] Session check error:", error)
+        if (mounted) {
+          sessionCheckCompleted.current = true
+          clearTimeout(checkTimeout)
+          setCheckingSession(false)
+        }
+      }
     }
+
     checkSession()
+
+    return () => {
+      mounted = false
+      clearTimeout(checkTimeout)
+    }
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,32 +80,41 @@ export default function HomePage() {
     setLoading(true)
     setError(null)
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (authError) {
-      if (authError.message.includes("Invalid login credentials") || authError.message.includes("invalid")) {
-        setError("The password you entered is incorrect. Please check your credentials and try again.")
-      } else if (authError.message.includes("Email not confirmed")) {
-        setError("Please verify your email address before logging in. Check your inbox for a confirmation link.")
-      } else {
-        setError("Unable to sign in. Please check your email and password and try again.")
+      if (authError) {
+        if (authError.message.includes("Invalid login credentials") || authError.message.includes("invalid")) {
+          setError("The password you entered is incorrect. Please check your credentials and try again.")
+        } else if (authError.message.includes("Email not confirmed")) {
+          setError("Please verify your email address before logging in. Check your inbox for a confirmation link.")
+        } else {
+          setError("Unable to sign in. Please check your email and password and try again.")
+        }
+        setLoading(false)
+        return
       }
-      setLoading(false)
-      return
-    }
-    
-    if (data.user) {
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
 
-      const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
-      router.push(destination)
+      if (data.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
+
+        const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+        window.location.href = destination
+      }
+    } catch (error) {
+      console.error("[v0] Login error:", error)
+      setError("An unexpected error occurred. Please try again.")
+      setLoading(false)
     }
   }
 
   if (checkingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
     )
   }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from 'next/navigation'
+import { useRouter } from "next/navigation"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,9 +10,17 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, User, Lock, Bell, Calendar, Download } from 'lucide-react'
+import { Loader2, User, Lock, Bell, Calendar, Download, Eye, EyeOff } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 type Profile = {
   id: string
@@ -48,6 +56,13 @@ export default function ProfilePage() {
     urgent: true,
   })
   const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false)
+
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     loadProfile()
@@ -87,15 +102,37 @@ export default function ProfilePage() {
     setLoading(false)
   }
 
+  function sanitizeInput(input: string): string {
+    return input
+      .replace(/[<>]/g, "") // Remove potential HTML tags
+      .trim()
+      .slice(0, 255) // Limit length
+  }
+
+  function sanitizePhone(input: string): string {
+    return input
+      .replace(/[^\d\s\-$$$$+]/g, "") // Only allow digits, spaces, dashes, parentheses, plus
+      .trim()
+      .slice(0, 20)
+  }
+
   async function handleSaveProfile() {
     if (!profile) return
+
+    const sanitizedName = sanitizeInput(name)
+    const sanitizedPhone = sanitizePhone(phone)
+
+    if (sanitizedName.length < 1) {
+      toast.error("Name cannot be empty")
+      return
+    }
 
     setSaving(true)
     const { error } = await supabase
       .from("profiles")
       .update({
-        name,
-        phone,
+        name: sanitizedName,
+        phone: sanitizedPhone,
         email_opt_in: emailOptIn,
         email_categories: emailCategories,
         calendar_sync_enabled: calendarSyncEnabled,
@@ -113,15 +150,40 @@ export default function ProfilePage() {
   }
 
   async function handleChangePassword() {
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters")
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match")
+      return
+    }
+
+    // Password strength validation
+    const hasUppercase = /[A-Z]/.test(newPassword)
+    const hasLowercase = /[a-z]/.test(newPassword)
+    const hasNumber = /[0-9]/.test(newPassword)
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      toast.error("Password must contain uppercase, lowercase, and number")
+      return
+    }
+
+    setChangingPassword(true)
     const { error } = await supabase.auth.updateUser({
-      password: prompt("Enter new password:") || "",
+      password: newPassword,
     })
 
     if (error) {
-      toast.error("Failed to change password")
+      toast.error("Failed to change password: " + error.message)
     } else {
       toast.success("Password updated successfully!")
+      setShowPasswordDialog(false)
+      setNewPassword("")
+      setConfirmPassword("")
     }
+    setChangingPassword(false)
   }
 
   function getCalendarSyncUrl() {
@@ -401,7 +463,7 @@ export default function ProfilePage() {
                   <Label>Password</Label>
                   <div className="flex gap-2">
                     <Input type="password" value="••••••••" disabled className="bg-muted" />
-                    <Button variant="outline" onClick={handleChangePassword}>
+                    <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
                       Change
                     </Button>
                   </div>
@@ -420,10 +482,113 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
+
+                <div className="rounded-lg bg-muted p-4">
+                  <h4 className="font-medium mb-2">Password Requirements</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• At least 8 characters long</li>
+                    <li>• Contains uppercase letter (A-Z)</li>
+                    <li>• Contains lowercase letter (a-z)</li>
+                    <li>• Contains number (0-9)</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change Password</DialogTitle>
+              <DialogDescription>
+                Enter your new password. Make sure it meets the security requirements.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <div className="relative">
+                  <Input
+                    id="new-password"
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    autoComplete="new-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    autoComplete="new-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              {newPassword && (
+                <div className="text-sm space-y-1">
+                  <p className={newPassword.length >= 8 ? "text-green-600" : "text-red-600"}>
+                    {newPassword.length >= 8 ? "✓" : "✗"} At least 8 characters
+                  </p>
+                  <p className={/[A-Z]/.test(newPassword) ? "text-green-600" : "text-red-600"}>
+                    {/[A-Z]/.test(newPassword) ? "✓" : "✗"} Uppercase letter
+                  </p>
+                  <p className={/[a-z]/.test(newPassword) ? "text-green-600" : "text-red-600"}>
+                    {/[a-z]/.test(newPassword) ? "✓" : "✗"} Lowercase letter
+                  </p>
+                  <p className={/[0-9]/.test(newPassword) ? "text-green-600" : "text-red-600"}>
+                    {/[0-9]/.test(newPassword) ? "✓" : "✗"} Number
+                  </p>
+                  {confirmPassword && (
+                    <p className={newPassword === confirmPassword ? "text-green-600" : "text-red-600"}>
+                      {newPassword === confirmPassword ? "✓" : "✗"} Passwords match
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleChangePassword} disabled={changingPassword}>
+                {changingPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Password"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </RequireAuth>
   )

@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { useSessionRole } from "@/lib/useSession"
 import { Button } from "@/components/ui/button"
-import { Menu, X } from 'lucide-react'
+import { Menu, X } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -37,27 +37,42 @@ export default function Header() {
     setSigningOut(true)
 
     try {
-      const { error } = await supabase.auth.signOut({ scope: 'global' })
-      
+      // Sign out from Supabase with global scope to clear all sessions
+      const { error } = await supabase.auth.signOut({ scope: "global" })
+
       if (error) {
-        throw error
+        console.error("Supabase sign out error:", error)
+        // Continue with cleanup even if Supabase signOut fails
       }
 
-      if (typeof window !== 'undefined') {
+      // Clear all storage to ensure complete logout
+      if (typeof window !== "undefined") {
         try {
-          localStorage.removeItem('volunteer-hub-cache')
+          // Clear sessionStorage (where auth tokens are now stored)
           sessionStorage.clear()
+          // Clear localStorage for any cached data
+          localStorage.removeItem("volunteer-hub-cache")
+          // Clear any other potential auth-related items
+          const keysToRemove: string[] = []
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i)
+            if (key && (key.includes("supabase") || key.includes("sb-"))) {
+              keysToRemove.push(key)
+            }
+          }
+          keysToRemove.forEach((key) => localStorage.removeItem(key))
         } catch (storageError) {
-          console.error('Storage cleanup error:', storageError)
+          console.error("Storage cleanup error:", storageError)
         }
       }
 
-      r.push("/")
+      // Use hard redirect to fully reload the page and clear any in-memory state
+      window.location.href = "/"
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
       console.error("Sign out error:", error)
       setSigningOut(false)
-      
+
       toast({
         title: "Sign out failed",
         description: errorMessage,
@@ -70,7 +85,10 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href={userId ? (role === "admin" ? "/admin" : "/volunteer") : "/"} className="text-xl font-bold text-foreground">
+          <Link
+            href={userId ? (role === "admin" ? "/admin" : "/volunteer") : "/"}
+            className="text-xl font-bold text-foreground"
+          >
             Volunteer Hub
           </Link>
 
