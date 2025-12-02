@@ -12,7 +12,7 @@ export function createBrowserCloseHandler(options: BrowserCloseHandlerOptions) {
 
   let isUnloading = false
 
-  const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  const handleBeforeUnload = () => {
     isUnloading = true
     onBeforeUnload()
 
@@ -23,10 +23,8 @@ export function createBrowserCloseHandler(options: BrowserCloseHandlerOptions) {
       navigator.sendBeacon(logoutEndpoint, blob)
     }
 
-    // Note: Modern browsers ignore custom messages in beforeunload
-    // This is just to trigger the event handling
-    event.preventDefault()
-    event.returnValue = ""
+    // NOTE: We intentionally do NOT call event.preventDefault() or set event.returnValue
+    // This would trigger the browser's "Leave site?" dialog which we don't want
   }
 
   const handleVisibilityChange = () => {
