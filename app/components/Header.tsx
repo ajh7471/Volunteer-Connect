@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { useSessionRole } from "@/lib/useSession"
+import { useSession } from "@/lib/session/session-provider"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
 import { useState } from "react"
@@ -29,6 +30,7 @@ function NavLink({ href, label, onClick }: { href: string; label: string; onClic
 export default function Header() {
   const r = useRouter()
   const { userId, role, loading } = useSessionRole()
+  const { logout: sessionLogout } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const { toast } = useToast()
@@ -37,26 +39,22 @@ export default function Header() {
     setSigningOut(true)
 
     try {
-      // Sign out from Supabase with global scope to clear all sessions
+      await sessionLogout("manual_logout")
+
       const { error } = await supabase.auth.signOut({ scope: "global" })
 
       if (error) {
         console.error("Supabase sign out error:", error)
-        // Continue with cleanup even if Supabase signOut fails
       }
 
-      // Clear all storage to ensure complete logout
       if (typeof window !== "undefined") {
         try {
-          // Clear sessionStorage (where auth tokens are now stored)
           sessionStorage.clear()
-          // Clear localStorage for any cached data
           localStorage.removeItem("volunteer-hub-cache")
-          // Clear any other potential auth-related items
           const keysToRemove: string[] = []
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i)
-            if (key && (key.includes("supabase") || key.includes("sb-"))) {
+            if (key && (key.includes("supabase") || key.includes("sb-") || key.includes("vh_"))) {
               keysToRemove.push(key)
             }
           }
@@ -66,7 +64,6 @@ export default function Header() {
         }
       }
 
-      // Use hard redirect to fully reload the page and clear any in-memory state
       window.location.href = "/"
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
