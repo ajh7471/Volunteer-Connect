@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, Loader2, ArrowRight, Award } from 'lucide-react'
+import { Calendar, Clock, Loader2, ArrowRight, Award } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd, parseDate, formatTime12Hour } from "@/lib/date"
 
@@ -31,15 +31,8 @@ type AssignmentData = {
 
 export default function VolunteerDashboard() {
   const [loading, setLoading] = useState(true)
-  const [upcomingShifts, setUpcomingShifts] = useState<UpcomingShift[]>([])
-  const [thisMonthShifts, setThisMonthShifts] = useState<UpcomingShift[]>([])
-  const [stats, setStats] = useState({
-    totalUpcoming: 0,
-    thisMonth: 0,
-    nextShift: null as UpcomingShift | null,
-    totalCompletedShifts: 0,
-    totalHoursWorked: 0,
-  })
+  const [assignments, setAssignments] = useState<AssignmentData[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
     loadDashboardData()
@@ -48,22 +41,19 @@ export default function VolunteerDashboard() {
   async function loadDashboardData() {
     setLoading(true)
 
-    const { data: userData } = await supabase.auth.getUser()
-    const userId = userData.user?.id
+    const { data: sessionData } = await supabase.auth.getSession()
+    const uid = sessionData.session?.user?.id
 
-    if (!userId) {
+    if (!uid) {
       setLoading(false)
       return
     }
 
-    const today = ymd(new Date())
-    const startOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
-    const endOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0))
+    setUserId(uid)
 
-    const { data: assignments, error } = await supabase
+    const { data: assignmentsData } = await supabase
       .from("shift_assignments")
-      .select(
-        `
+      .select(`
         id,
         shift_id,
         shifts (
@@ -72,72 +62,64 @@ export default function VolunteerDashboard() {
           end_time,
           slot
         )
-      `,
-      )
-      .eq("user_id", userId)
+      `)
+      .eq("user_id", uid)
+
+    setAssignments(assignmentsData || [])
+    setLoading(false)
+  }
+
+  const { upcomingShifts, thisMonthShifts, stats } = useMemo(() => {
+    const today = ymd(new Date())
+    const startOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+    const endOfMonth = ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0))
 
     let completedCount = 0
     let totalHours = 0
     const upcoming: UpcomingShift[] = []
 
-    if (assignments && assignments.length > 0) {
-      assignments.forEach((assignment: AssignmentData) => {
-        if (!assignment.shifts) {
-          return
+    assignments.forEach((assignment: AssignmentData) => {
+      if (!assignment.shifts) return
+
+      const shiftDate = assignment.shifts.shift_date
+
+      if (shiftDate < today) {
+        completedCount++
+        const start = assignment.shifts.start_time
+        const end = assignment.shifts.end_time
+        if (start && end) {
+          const [startHour, startMin] = start.split(":").map(Number)
+          const [endHour, endMin] = end.split(":").map(Number)
+          const hours = endHour - startHour + (endMin - startMin) / 60
+          totalHours += hours
         }
+      } else {
+        upcoming.push({
+          id: assignment.id,
+          shift_date: shiftDate,
+          start_time: assignment.shifts.start_time,
+          end_time: assignment.shifts.end_time,
+          slot: assignment.shifts.slot,
+        })
+      }
+    })
 
-        const shiftDate = assignment.shifts.shift_date
+    upcoming.sort((a, b) => a.shift_date.localeCompare(b.shift_date))
 
-        if (shiftDate < today) {
-          completedCount++
-          const start = assignment.shifts.start_time
-          const end = assignment.shifts.end_time
-          if (start && end) {
-            const [startHour, startMin] = start.split(":").map(Number)
-            const [endHour, endMin] = end.split(":").map(Number)
-            const hours = endHour - startHour + (endMin - startMin) / 60
-            totalHours += hours
-          }
-        } else {
-          upcoming.push({
-            id: assignment.id,
-            shift_date: shiftDate,
-            start_time: assignment.shifts.start_time,
-            end_time: assignment.shifts.end_time,
-            slot: assignment.shifts.slot,
-          })
-        }
-      })
+    const thisMonth = upcoming.filter((s: UpcomingShift) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth)
 
-      upcoming.sort((a, b) => a.shift_date.localeCompare(b.shift_date))
-
-      const thisMonth = upcoming.filter((s: UpcomingShift) => s.shift_date >= startOfMonth && s.shift_date <= endOfMonth)
-
-      setUpcomingShifts(upcoming.slice(0, 3))
-
-      setThisMonthShifts(thisMonth)
-
-      setStats({
+    return {
+      upcomingShifts: upcoming.slice(0, 3),
+      thisMonthShifts: thisMonth,
+      stats: {
         totalUpcoming: upcoming.length,
         thisMonth: thisMonth.length,
         nextShift: upcoming[0] || null,
         totalCompletedShifts: completedCount,
         totalHoursWorked: Math.round(totalHours * 10) / 10,
-      })
-    } else {
-      setUpcomingShifts([])
-      setThisMonthShifts([])
-      setStats({
-        totalUpcoming: 0,
-        thisMonth: 0,
-        nextShift: null,
-        totalCompletedShifts: 0,
-        totalHoursWorked: 0,
-      })
+      },
     }
-
-    setLoading(false)
-  }
+  }, [assignments])
 
   if (loading) {
     return (
@@ -226,7 +208,7 @@ export default function VolunteerDashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {thisMonthShifts.map((shift: UpcomingShift, index: number) => {
+                {thisMonthShifts.map((shift: UpcomingShift) => {
                   const date = parseDate(shift.shift_date)
                   const isNextShift = stats.nextShift?.id === shift.id
                   const today = new Date()

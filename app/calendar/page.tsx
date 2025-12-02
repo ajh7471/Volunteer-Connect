@@ -1,21 +1,29 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import RequireAuth from "@/app/components/RequireAuth"
 import { MonthlyGrid } from "@/components/calendar/MonthlyGrid"
 import { ShiftModal } from "@/components/calendar/ShiftModal"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarIcon, Loader2, Clock, Users } from "lucide-react"
 import { addMonths, ymd, parseDate } from "@/lib/date"
-import { getMonthShifts, signUpForShift, type ShiftWithCapacity, getCapacityStatus } from "@/lib/shifts"
+import {
+  getMonthShifts,
+  signUpForShift,
+  signUpForRecurringShifts,
+  type ShiftWithCapacity,
+  type RecurrencePattern,
+  getCapacityStatus,
+  invalidateShiftCache,
+} from "@/lib/shifts"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "@/lib/toast"
 import { joinWaitlist } from "@/app/admin/shift-management-actions"
 import Link from "next/link"
-import { AssignmentWithRelations } from "@/types/database"
+import type { AssignmentWithRelations } from "@/types/database"
 
 export default function CalendarPage() {
   const router = useRouter()
@@ -32,47 +40,51 @@ export default function CalendarPage() {
   const [loadingAttendees, setLoadingAttendees] = useState<Set<string>>(new Set())
 
   useEffect(() => {
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getSession()
+      setUserId(data.session?.user?.id || null)
+    }
     loadUser()
   }, [])
 
-  useEffect(() => {
-    loadMonthData()
-  }, [currentMonth, userId]) // Added userId dependency to reload data when user is authenticated
+  const loadMonthData = useCallback(async () => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
 
-  async function loadUser() {
-    const { data } = await supabase.auth.getUser()
-    setUserId(data.user?.id || null)
-  }
-
-  async function loadMonthData() {
     setLoading(true)
 
-    // Fetch shifts for the month
-    const monthShifts = await getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth())
+    const [monthShifts, assignmentsResult] = await Promise.all([
+      getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth()),
+      (async () => {
+        const shiftIds = (await getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth())).map((s) => s.id)
+        if (shiftIds.length === 0) return { data: [] }
+        return supabase.from("shift_assignments").select("shift_id").eq("user_id", userId).in("shift_id", shiftIds)
+      })(),
+    ])
+
     setShifts(monthShifts)
 
-    // Load user's assignments for these shifts
-    if (userId) {
-      const shiftIds = monthShifts.map((s: ShiftWithCapacity) => s.id)
-      if (shiftIds.length > 0) {
-        const { data } = await supabase
-          .from("shift_assignments")
-          .select("shift_id")
-          .eq("user_id", userId)
-          .in("shift_id", shiftIds)
-
-        if (data) {
-          setUserAssignments(new Set(data.map((a: { shift_id: string }) => a.shift_id)))
-        } else {
-          setUserAssignments(new Set())
-        }
-      } else {
-        setUserAssignments(new Set())
-      }
+    if (assignmentsResult.data) {
+      setUserAssignments(new Set(assignmentsResult.data.map((a: { shift_id: string }) => a.shift_id)))
+    } else {
+      setUserAssignments(new Set())
     }
 
     setLoading(false)
-  }
+  }, [currentMonth, userId])
+
+  useEffect(() => {
+    if (userId) {
+      loadMonthData()
+    }
+  }, [loadMonthData, userId])
+
+  const monthName = useMemo(
+    () => currentMonth.toLocaleString("default", { month: "long", year: "numeric" }),
+    [currentMonth],
+  )
 
   function handlePrevMonth() {
     setCurrentMonth(addMonths(currentMonth, -1))
@@ -91,7 +103,6 @@ export default function CalendarPage() {
   function handleShiftClick(shift: ShiftWithCapacity) {
     setSelectedShift(shift)
     setIsModalOpen(true)
-    // Pre-load attendees when opening modal
     loadShiftAttendees(shift.id)
   }
 
@@ -102,25 +113,30 @@ export default function CalendarPage() {
 
     const { data, error } = await supabase
       .from("shift_assignments")
-      .select(
-        `
+      .select(`
         user_id,
         profiles (
           name,
           id
         )
-      `,
-      )
+      `)
       .eq("shift_id", shiftId)
+
+    if (error) {
+      console.error("[v0] Error loading shift attendees:", error)
+    }
 
     const attendeesList =
       !error && data
         ? (data as AssignmentWithRelations[])
-            .filter((a: AssignmentWithRelations) => a.profiles?.name)
-            .map((a: AssignmentWithRelations) => ({
-              name: a.profiles?.name || 'Unknown',
-              id: a.profiles?.id || '',
-            }))
+            .map((a: AssignmentWithRelations) => {
+              if (!a.profiles) return null
+              return {
+                name: a.profiles.name || "Unknown",
+                id: a.profiles.id || "",
+              }
+            })
+            .filter((item): item is { name: string; id: string } => item !== null)
         : []
 
     setShiftAttendees((prev) => ({
@@ -144,20 +160,9 @@ export default function CalendarPage() {
 
     if (result.success) {
       toast.success("Successfully signed up for shift!")
+      invalidateShiftCache(currentMonth.getFullYear(), currentMonth.getMonth())
       await loadMonthData()
-      // Update selected shift data if modal is open
-      if (selectedShift && selectedShift.id === shiftId) {
-        // We need to refresh the selected shift data from the new shifts array
-        // But loadMonthData updates 'shifts' state asynchronously.
-        // For now, we'll just close the modal or let the user see the update on next render if we could sync it.
-        // Actually, since we await loadMonthData, 'shifts' should be updated? 
-        // No, state updates are batched/async. 
-        // But we can just close it for a simple UX, or keep it open.
-        // Let's keep it open but we need to update the 'selectedShift' object to reflect new counts.
-        // We'll handle that in a useEffect or just close it.
-        // Closing it is safer to avoid stale data display.
-        setIsModalOpen(false)
-      }
+      setIsModalOpen(false)
       setSelectedDate(null)
     } else {
       toast.error(result.error || "Failed to sign up")
@@ -176,7 +181,6 @@ export default function CalendarPage() {
 
     setSigningUpShifts((prev) => new Set(prev).add(shiftId))
 
-    // Find assignment ID first
     const { data } = await supabase
       .from("shift_assignments")
       .select("id")
@@ -191,6 +195,7 @@ export default function CalendarPage() {
         toast.error("Failed to cancel signup")
       } else {
         toast.success("Signup cancelled successfully")
+        invalidateShiftCache(currentMonth.getFullYear(), currentMonth.getMonth())
         await loadMonthData()
         setIsModalOpen(false)
         setSelectedDate(null)
@@ -215,6 +220,7 @@ export default function CalendarPage() {
       toast.error("Failed to cancel signup")
     } else {
       toast.success("Signup cancelled successfully")
+      invalidateShiftCache(currentMonth.getFullYear(), currentMonth.getMonth())
       await loadMonthData()
       setSelectedDate(null)
     }
@@ -229,6 +235,7 @@ export default function CalendarPage() {
 
     if (result.success) {
       toast.success(`Joined waitlist! You're position #${result.position}`)
+      invalidateShiftCache(currentMonth.getFullYear(), currentMonth.getMonth())
       await loadMonthData()
       setIsModalOpen(false)
     } else {
@@ -242,26 +249,50 @@ export default function CalendarPage() {
     })
   }
 
-  const selectedDateShifts = selectedDate
-    ? shifts.filter((s: ShiftWithCapacity) => {
-        if (s.shift_date !== ymd(selectedDate)) return false
+  async function handleRecurringSignUp(shiftId: string, recurrence: RecurrencePattern, endDate: Date) {
+    if (!userId) return
 
-        const now = new Date()
-        const shiftDate = parseDate(s.shift_date)
-        const [hours, minutes] = s.end_time.split(":").map(Number)
-        const shiftEndTime = new Date(
-          shiftDate.getFullYear(),
-          shiftDate.getMonth(),
-          shiftDate.getDate(),
-          hours,
-          minutes,
+    setSigningUpShifts((prev) => new Set(prev).add(shiftId))
+
+    const result = await signUpForRecurringShifts(shiftId, userId, recurrence, ymd(endDate))
+
+    if (result.success) {
+      if (result.signedUp > 0) {
+        toast.success(
+          `Successfully signed up for ${result.signedUp} shifts!${result.skipped > 0 ? ` (${result.skipped} skipped - already signed up or full)` : ""}`,
         )
+      } else {
+        toast.info(result.errors[0] || "No new shifts to sign up for")
+      }
+      invalidateShiftCache()
+      await loadMonthData()
+      setIsModalOpen(false)
+      setSelectedDate(null)
+    } else {
+      toast.error(result.errors[0] || "Failed to sign up for recurring shifts")
+    }
 
-        return shiftEndTime > now
-      })
-    : []
+    setSigningUpShifts((prev) => {
+      const newSet = new Set(prev)
+      newSet.delete(shiftId)
+      return newSet
+    })
+  }
 
-  const monthName = currentMonth.toLocaleString("default", { month: "long", year: "numeric" })
+  const selectedDateShifts = useMemo(() => {
+    if (!selectedDate) return []
+
+    return shifts.filter((s: ShiftWithCapacity) => {
+      if (s.shift_date !== ymd(selectedDate)) return false
+
+      const now = new Date()
+      const shiftDate = parseDate(s.shift_date)
+      const [hours, minutes] = s.end_time.split(":").map(Number)
+      const shiftEndTime = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), hours, minutes)
+
+      return shiftEndTime > now
+    })
+  }, [selectedDate, shifts])
 
   return (
     <RequireAuth>
@@ -328,11 +359,11 @@ export default function CalendarPage() {
                 </CardContent>
               </Card>
             ) : (
-              <MonthlyGrid 
-                currentMonth={currentMonth} 
-                shifts={shifts} 
+              <MonthlyGrid
+                currentMonth={currentMonth}
+                shifts={shifts}
                 userAssignments={userAssignments}
-                onDayClick={handleDayClick} 
+                onDayClick={handleDayClick}
                 onShiftClick={handleShiftClick}
               />
             )}
@@ -507,7 +538,7 @@ export default function CalendarPage() {
                                   Signing up...
                                 </>
                               ) : (
-                                "Add to My Shifts"
+                                "Sign Up"
                               )}
                             </Button>
                           )}
@@ -520,29 +551,30 @@ export default function CalendarPage() {
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-sm text-muted-foreground">Click on a date to view and manage shifts</p>
+                  <CalendarIcon className="mb-4 h-12 w-12 text-muted-foreground" />
+                  <p className="mb-2 text-lg font-medium">Select a Date</p>
+                  <p className="text-sm text-muted-foreground">Click on a day to view available shifts</p>
                 </CardContent>
               </Card>
             )}
           </div>
         </div>
-      </div>
 
-      <ShiftModal
-        shift={selectedShift}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        userId={userId}
-        isAssigned={selectedShift ? userAssignments.has(selectedShift.id) : false}
-        isSigningUp={selectedShift ? signingUpShifts.has(selectedShift.id) : false}
-        attendees={selectedShift ? shiftAttendees[selectedShift.id] : undefined}
-        isLoadingAttendees={selectedShift ? loadingAttendees.has(selectedShift.id) : false}
-        onSignUp={handleSignUp}
-        onCancel={handleRemoveFromShift}
-        onJoinWaitlist={handleJoinWaitlist}
-        onLoadAttendees={loadShiftAttendees}
-      />
+        <ShiftModal
+          shift={selectedShift}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSignUp={handleSignUp}
+          onRemove={handleRemoveFromShift}
+          onJoinWaitlist={handleJoinWaitlist}
+          onRecurringSignUp={handleRecurringSignUp}
+          isAssigned={selectedShift ? userAssignments.has(selectedShift.id) : false}
+          isSigningUp={selectedShift ? signingUpShifts.has(selectedShift.id) : false}
+          attendees={selectedShift ? shiftAttendees[selectedShift.id] : undefined}
+          isLoadingAttendees={selectedShift ? loadingAttendees.has(selectedShift.id) : false}
+          currentUserId={userId}
+        />
+      </div>
     </RequireAuth>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabaseClient"
 import { useState, useEffect } from "react"
 import { Suspense } from "react"
 import SendGridForm from "./sendgrid-form"
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle2, XCircle, AlertCircle, Mail, Settings } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Mail, Settings } from "lucide-react"
 
 interface EmailServiceConfig {
   id: string
@@ -47,7 +47,9 @@ type GmailConfig = EmailServiceConfig & {
 }
 
 function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[] }) {
-  const sendgridConfig = configs.find((c) => c.service_name === "sendgrid" && c.sendgrid_api_key) as SendGridConfig | undefined
+  const sendgridConfig = configs.find((c) => c.service_name === "sendgrid" && c.sendgrid_api_key) as
+    | SendGridConfig
+    | undefined
   const gmailConfig = configs.find((c) => c.service_name === "gmail" && c.gmail_client_id) as GmailConfig | undefined
 
   return (
@@ -200,11 +202,10 @@ function EmailServiceConfigurations({ configs }: { configs: EmailServiceConfig[]
 
 export default function EmailServicePage() {
   const [configs, setConfigs] = useState<EmailServiceConfig[]>([])
-  const supabase = createClient()
 
   useEffect(() => {
     const fetchConfigs = async () => {
-      const { data } = await supabase.from('email_service_config').select('*')
+      const { data } = await supabase.from("email_service_config").select("*")
       setConfigs(data || [])
     }
 

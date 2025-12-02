@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
@@ -13,47 +13,116 @@ export default function AdminDashboard() {
   const router = useRouter()
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [stats, setStats] = useState({ volunteers: 0, shifts: 0, assignments: 0 })
+  const [error, setError] = useState<string | null>(null)
+  const adminCheckCompleted = useRef(false)
 
   useEffect(() => {
-    ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      const uid = auth.user?.id
-      if (!uid) {
+    let mounted = true
+
+    const loadTimeout = setTimeout(() => {
+      if (mounted && !adminCheckCompleted.current) {
+        console.warn("[v0] Admin check timeout - check did not complete")
+        setError("Session timeout. Please try refreshing the page.")
         setIsAdmin(false)
-        return
       }
+    }, 3000)
 
-      const { data } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()
+    const checkAdmin = async () => {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
 
-      if (data?.role === "admin") {
-        setIsAdmin(true)
-        // Load stats
+        if (!mounted) return
+
+        if (sessionError || !sessionData.session) {
+          adminCheckCompleted.current = true
+          setIsAdmin(false)
+          clearTimeout(loadTimeout)
+          return
+        }
+
+        const uid = sessionData.session.user.id
+
+        const { data, error: profileError } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()
+
+        if (!mounted) return
+
+        adminCheckCompleted.current = true
+        clearTimeout(loadTimeout)
+
+        if (profileError) {
+          console.error("[v0] Profile fetch error:", profileError)
+          setError("Unable to verify permissions. Please try again.")
+          setIsAdmin(false)
+          return
+        }
+
+        if (data?.role === "admin") {
+          setIsAdmin(true)
+          loadStats()
+        } else {
+          setIsAdmin(false)
+        }
+      } catch (error) {
+        console.error("[v0] Admin dashboard error:", error)
+        if (mounted) {
+          adminCheckCompleted.current = true
+          setError("An error occurred. Please try refreshing the page.")
+          setIsAdmin(false)
+        }
+        clearTimeout(loadTimeout)
+      }
+    }
+
+    const loadStats = async () => {
+      try {
         const [volData, shiftData, assignData] = await Promise.all([
           supabase.from("profiles").select("id", { count: "exact", head: true }),
           supabase.from("shifts").select("id", { count: "exact", head: true }),
           supabase.from("shift_assignments").select("id", { count: "exact", head: true }),
         ])
-        setStats({
-          volunteers: volData.count || 0,
-          shifts: shiftData.count || 0,
-          assignments: assignData.count || 0,
-        })
-      } else {
-        setIsAdmin(false)
+        if (mounted) {
+          setStats({
+            volunteers: volData.count || 0,
+            shifts: shiftData.count || 0,
+            assignments: assignData.count || 0,
+          })
+        }
+      } catch (e) {
+        console.error("[v0] Stats load error:", e)
       }
-    })()
+    }
+
+    checkAdmin()
+
+    return () => {
+      mounted = false
+      clearTimeout(loadTimeout)
+    }
   }, [])
 
   if (isAdmin === false) {
     return (
       <RequireAuth>
-        <Card>
+        <Card className="mx-auto mt-8 max-w-md">
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
-            <CardDescription>You need admin privileges to access this page.</CardDescription>
+            <CardDescription>{error || "You need admin privileges to access this page."}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex gap-2">
             <Button onClick={() => router.push("/calendar")}>Go to Calendar</Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                sessionStorage.clear()
+                localStorage.clear()
+                window.location.href = "/"
+              }}
+            >
+              Logout
+            </Button>
           </CardContent>
         </Card>
       </RequireAuth>
@@ -63,8 +132,11 @@ export default function AdminDashboard() {
   if (isAdmin === null) {
     return (
       <RequireAuth>
-        <div className="text-center">
-          <p className="text-muted-foreground">Checking permissions...</p>
+        <div className="mx-auto mt-8 max-w-md text-center">
+          <div className="flex items-center justify-center gap-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+            <p className="text-muted-foreground">Checking permissions...</p>
+          </div>
         </div>
       </RequireAuth>
     )
@@ -157,7 +229,7 @@ export default function AdminDashboard() {
               <CardDescription>Send emails to opted-in volunteers</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild className="w-full">
+              <Button asChild variant="outline" className="w-full bg-transparent">
                 <Link href="/admin/emails">Manage Emails</Link>
               </Button>
             </CardContent>

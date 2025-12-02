@@ -32,17 +32,46 @@ export async function middleware(request: NextRequest) {
     const { data } = await supabase.auth.getUser()
     user = data.user
   } catch (error) {
+    console.error("Middleware auth error:", error)
     user = null
   }
 
   const { pathname } = request.nextUrl
 
+  if (!user && (pathname === "/" || pathname.startsWith("/auth"))) {
+    // Clear any stale auth cookies to prevent stuck states
+    const authCookies = request.cookies.getAll().filter((c) => c.name.includes("sb-") || c.name.includes("supabase"))
+    authCookies.forEach((cookie) => {
+      response.cookies.delete(cookie.name)
+    })
+
+    // Add security headers and return
+    addSecurityHeaders(response)
+    return response
+  }
+
   // Redirect authenticated users away from login pages
   if (user && (pathname === "/" || pathname.startsWith("/auth"))) {
-    // Check role to determine destination
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
-    return NextResponse.redirect(new URL(destination, request.url))
+    try {
+      // Check role to determine destination
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError) {
+        console.error("Profile fetch error:", profileError)
+        // Default to volunteer if profile fetch fails
+        return NextResponse.redirect(new URL("/volunteer", request.url))
+      }
+
+      const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+      return NextResponse.redirect(new URL(destination, request.url))
+    } catch (error) {
+      console.error("Redirect error:", error)
+      return NextResponse.redirect(new URL("/volunteer", request.url))
+    }
   }
 
   // Protect admin routes
@@ -51,10 +80,19 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url))
     }
 
-    // Check admin role
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    try {
+      // Check admin role
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
 
-    if (profile?.role !== "admin") {
+      if (profileError || profile?.role !== "admin") {
+        return NextResponse.redirect(new URL("/volunteer", request.url))
+      }
+    } catch (error) {
+      console.error("Admin check error:", error)
       return NextResponse.redirect(new URL("/volunteer", request.url))
     }
   }
@@ -66,6 +104,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  addSecurityHeaders(response)
+
+  return response
+}
+
+function addSecurityHeaders(response: NextResponse) {
   const securityHeaders = {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
@@ -80,8 +124,6 @@ export async function middleware(request: NextRequest) {
   Object.entries(securityHeaders).forEach(([key, value]) => {
     response.headers.set(key, value)
   })
-
-  return response
 }
 
 export const config = {
