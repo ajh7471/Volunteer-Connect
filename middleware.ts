@@ -1,70 +1,40 @@
-import { createServerClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
+  const supabaseResponse = NextResponse.next({
+    request,
+  })
+
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        cookie: request.headers.get("cookie") || "",
+      },
     },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
-        },
-      },
-    },
-  )
-
-  let user = null
-  try {
-    const { data } = await supabase.auth.getUser()
-    user = data.user
-  } catch (error) {
-    console.error("Middleware auth error:", error)
-    user = null
-  }
+  // IMPORTANT: Do not run code between createServerClient and supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
 
+  // Allow unauthenticated access to login pages
   if (!user && (pathname === "/" || pathname.startsWith("/auth"))) {
-    // Clear any stale auth cookies to prevent stuck states
-    const authCookies = request.cookies.getAll().filter((c) => c.name.includes("sb-") || c.name.includes("supabase"))
-    authCookies.forEach((cookie) => {
-      response.cookies.delete(cookie.name)
-    })
-
-    // Add security headers and return
-    addSecurityHeaders(response)
-    return response
+    addSecurityHeaders(supabaseResponse)
+    return supabaseResponse
   }
 
   // Redirect authenticated users away from login pages
   if (user && (pathname === "/" || pathname.startsWith("/auth"))) {
     try {
-      // Check role to determine destination
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError) {
-        console.error("Profile fetch error:", profileError)
-        // Default to volunteer if profile fetch fails
-        return NextResponse.redirect(new URL("/volunteer", request.url))
-      }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
       const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
       return NextResponse.redirect(new URL(destination, request.url))
@@ -81,14 +51,9 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      // Check admin role
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single()
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-      if (profileError || profile?.role !== "admin") {
+      if (profile?.role !== "admin") {
         return NextResponse.redirect(new URL("/volunteer", request.url))
       }
     } catch (error) {
@@ -97,6 +62,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Protect other authenticated routes
   const protectedRoutes = ["/calendar", "/my-schedule", "/profile", "/volunteer"]
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     if (!user) {
@@ -104,9 +70,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  addSecurityHeaders(response)
-
-  return response
+  addSecurityHeaders(supabaseResponse)
+  return supabaseResponse
 }
 
 function addSecurityHeaders(response: NextResponse) {
@@ -127,14 +92,5 @@ function addSecurityHeaders(response: NextResponse) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - manifest.json (web manifest)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|images).*)"],
 }

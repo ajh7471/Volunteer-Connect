@@ -28,6 +28,21 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
 
+    const { error: tableCheckError } = await supabase.from("user_sessions").select("id").limit(1)
+
+    if (tableCheckError && tableCheckError.code === "PGRST116") {
+      // Table doesn't exist - return success without storing session
+      console.warn(
+        "[Session API] user_sessions table not found. Session tracking disabled. Run scripts/020_session_management.sql to enable.",
+      )
+      return NextResponse.json({
+        success: true,
+        sessionId: "mock-session-id",
+        expiresAt: new Date(Date.now() + (config.absoluteTimeoutHours || 8) * 60 * 60 * 1000).toISOString(),
+        tableNotFound: true,
+      })
+    }
+
     // Get client IP address
     const forwardedFor = request.headers.get("x-forwarded-for")
     const ipAddress = forwardedFor?.split(",")[0].trim() || request.headers.get("x-real-ip") || "0.0.0.0"

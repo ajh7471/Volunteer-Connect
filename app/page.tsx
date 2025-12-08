@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -112,6 +113,14 @@ export default function HomePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30">
         <div className="flex flex-col items-center gap-3">
+          <Image
+            src="/images/vanderpump-dogs-logo.png"
+            alt="Vanderpump Dogs Foundation"
+            width={200}
+            height={100}
+            className="mb-4"
+            priority
+          />
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
@@ -122,9 +131,14 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30 px-4">
       <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">Volunteer Hub</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Coordinate volunteer shifts with ease</p>
+        <div className="flex justify-center">
+          <Image
+            src="/images/vanderpump-dogs-logo.png"
+            alt="Vanderpump Dogs Foundation"
+            width={280}
+            height={140}
+            priority
+          />
         </div>
 
         <Card className="w-full shadow-lg">
