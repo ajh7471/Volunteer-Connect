@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +20,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [logoError, setLogoError] = useState(false)
   const sessionCheckCompleted = useRef(false)
 
   useEffect(() => {
@@ -112,6 +114,19 @@ export default function HomePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30">
         <div className="flex flex-col items-center gap-3">
+          {!logoError ? (
+            <Image
+              src="/images/vanderpump-dogs-logo.png"
+              alt="Vanderpump Dogs Foundation"
+              width={200}
+              height={100}
+              className="mb-4 object-contain"
+              priority
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <h1 className="mb-4 text-2xl font-bold text-primary">Vanderpump Dogs</h1>
+          )}
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
@@ -122,9 +137,23 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted/30 px-4">
       <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">Volunteer Hub</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Coordinate volunteer shifts with ease</p>
+        <div className="flex justify-center">
+          {!logoError ? (
+            <Image
+              src="/images/vanderpump-dogs-logo.png"
+              alt="Vanderpump Dogs Foundation - Volunteer Portal"
+              width={280}
+              height={140}
+              className="h-auto w-full max-w-[280px] object-contain sm:max-w-[320px]"
+              priority
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <h1 className="text-3xl font-bold text-primary">Vanderpump Dogs</h1>
+              <p className="text-sm text-muted-foreground">Volunteer Portal</p>
+            </div>
+          )}
         </div>
 
         <Card className="w-full shadow-lg">
