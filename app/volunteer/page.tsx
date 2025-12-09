@@ -169,6 +169,34 @@ function DashboardContent() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Award className="h-5 w-5" />
+            Total Impact
+          </CardTitle>
+          <CardDescription>Your complete volunteering journey and contributions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Shifts Completed</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold">{stats.totalCompletedShifts}</span>
+                <span className="text-lg text-muted-foreground">shifts</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Hours Volunteered</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold">{stats.totalHoursWorked}</span>
+                <span className="text-lg text-muted-foreground">hours</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -265,34 +293,6 @@ function DashboardContent() {
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5" />
-            Total Impact
-          </CardTitle>
-          <CardDescription>Your complete volunteering journey and contributions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Shifts Completed</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold">{stats.totalCompletedShifts}</span>
-                <span className="text-lg text-muted-foreground">shifts</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Hours Volunteered</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold">{stats.totalHoursWorked}</span>
-                <span className="text-lg text-muted-foreground">hours</span>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
