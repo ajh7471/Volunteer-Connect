@@ -1,40 +1,31 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
+import { getSupabaseConfig, isSupabaseConfigured } from "./config"
 
 // Store the client instance globally to ensure only one client is created
-let clientInstance: ReturnType<typeof createSupabaseClient> | null = null
+let clientInstance: ReturnType<typeof createBrowserClient> | null = null
 
 /**
- * Creates or returns the existing Supabase browser client
- * Uses sessionStorage for session-only persistence (cleared on browser close)
+ * Creates a Supabase browser client with validated configuration
+ * Uses singleton pattern to maintain one client instance per browser session
+ *
+ * @throws {SupabaseConfigError} If required environment variables are missing
  */
 export function createClient() {
-  if (typeof window !== "undefined") {
-    const globalWindow = window as typeof window & { __supabaseClient?: ReturnType<typeof createSupabaseClient> }
-    if (globalWindow.__supabaseClient) {
-      return globalWindow.__supabaseClient
-    }
+  // Validate configuration before creating client
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase is not properly configured. Please check your environment variables.")
   }
+
+  const config = getSupabaseConfig()
 
   if (clientInstance) {
     return clientInstance
   }
 
-  clientInstance = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        storage: typeof window !== "undefined" ? window.sessionStorage : undefined,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        flowType: "pkce",
-      },
-    },
-  )
+  clientInstance = createBrowserClient(config.url, config.anonKey)
 
   if (typeof window !== "undefined") {
-    const globalWindow = window as typeof window & { __supabaseClient?: ReturnType<typeof createSupabaseClient> }
+    const globalWindow = window as typeof window & { __supabaseClient?: ReturnType<typeof createBrowserClient> }
     globalWindow.__supabaseClient = clientInstance
   }
 
@@ -44,7 +35,7 @@ export function createClient() {
 export function resetClient() {
   clientInstance = null
   if (typeof window !== "undefined") {
-    const globalWindow = window as typeof window & { __supabaseClient?: ReturnType<typeof createSupabaseClient> }
+    const globalWindow = window as typeof window & { __supabaseClient?: ReturnType<typeof createBrowserClient> }
     delete globalWindow.__supabaseClient
   }
 }
