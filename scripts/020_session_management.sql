@@ -126,7 +126,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION update_session_activity(token TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
-  session_found BOOLEAN;
+  rows_affected INTEGER;
 BEGIN
   UPDATE user_sessions
   SET last_activity_at = now()
@@ -134,8 +134,8 @@ BEGIN
     AND is_active = true
     AND expires_at > now();
   
-  GET DIAGNOSTICS session_found = ROW_COUNT > 0;
-  RETURN session_found;
+  GET DIAGNOSTICS rows_affected = ROW_COUNT;
+  RETURN rows_affected > 0;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
