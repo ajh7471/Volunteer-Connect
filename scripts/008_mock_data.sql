@@ -9,7 +9,8 @@
 -- Generate shifts for January 2025 (Current/Future Testing)
 DO $$
 DECLARE
-  current_date DATE := '2025-01-01';
+  -- Renamed current_date to curr_date to avoid PostgreSQL reserved keyword conflict
+  curr_date DATE := '2025-01-01';
   end_date DATE := '2025-01-31';
   shift_slots TEXT[] := ARRAY['AM', 'MID', 'PM'];
   shift_start_times TIME[] := ARRAY['08:00:00', '12:00:00', '16:00:00'];
@@ -17,25 +18,26 @@ DECLARE
   capacity_options INTEGER[] := ARRAY[2, 3, 4, 5];
   i INTEGER;
 BEGIN
-  WHILE current_date <= end_date LOOP
+  WHILE curr_date <= end_date LOOP
     FOR i IN 1..3 LOOP
       INSERT INTO shifts (shift_date, slot, start_time, end_time, capacity)
       VALUES (
-        current_date,
+        curr_date,
         shift_slots[i],
         shift_start_times[i],
         shift_end_times[i],
-        capacity_options[(EXTRACT(DAY FROM current_date)::INTEGER + i) % 4 + 1]
+        capacity_options[(EXTRACT(DAY FROM curr_date)::INTEGER + i) % 4 + 1]
       );
     END LOOP;
-    current_date := current_date + INTERVAL '1 day';
+    curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
 END $$;
 
 -- Generate shifts for February 2025
 DO $$
 DECLARE
-  current_date DATE := '2025-02-01';
+  -- Renamed current_date to curr_date
+  curr_date DATE := '2025-02-01';
   end_date DATE := '2025-02-28';
   shift_slots TEXT[] := ARRAY['AM', 'MID', 'PM'];
   shift_start_times TIME[] := ARRAY['08:00:00', '12:00:00', '16:00:00'];
@@ -43,25 +45,26 @@ DECLARE
   capacity_options INTEGER[] := ARRAY[3, 4, 5, 6];
   i INTEGER;
 BEGIN
-  WHILE current_date <= end_date LOOP
+  WHILE curr_date <= end_date LOOP
     FOR i IN 1..3 LOOP
       INSERT INTO shifts (shift_date, slot, start_time, end_time, capacity)
       VALUES (
-        current_date,
+        curr_date,
         shift_slots[i],
         shift_start_times[i],
         shift_end_times[i],
-        capacity_options[(EXTRACT(DAY FROM current_date)::INTEGER + i) % 4 + 1]
+        capacity_options[(EXTRACT(DAY FROM curr_date)::INTEGER + i) % 4 + 1]
       );
     END LOOP;
-    current_date := current_date + INTERVAL '1 day';
+    curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
 END $$;
 
 -- Generate shifts for March 2025
 DO $$
 DECLARE
-  current_date DATE := '2025-03-01';
+  -- Renamed current_date to curr_date
+  curr_date DATE := '2025-03-01';
   end_date DATE := '2025-03-31';
   shift_slots TEXT[] := ARRAY['AM', 'MID', 'PM'];
   shift_start_times TIME[] := ARRAY['08:00:00', '12:00:00', '16:00:00'];
@@ -69,42 +72,43 @@ DECLARE
   capacity_options INTEGER[] := ARRAY[2, 3, 4, 5];
   i INTEGER;
 BEGIN
-  WHILE current_date <= end_date LOOP
+  WHILE curr_date <= end_date LOOP
     FOR i IN 1..3 LOOP
       INSERT INTO shifts (shift_date, slot, start_time, end_time, capacity)
       VALUES (
-        current_date,
+        curr_date,
         shift_slots[i],
         shift_start_times[i],
         shift_end_times[i],
-        capacity_options[(EXTRACT(DAY FROM current_date)::INTEGER + i) % 4 + 1]
+        capacity_options[(EXTRACT(DAY FROM curr_date)::INTEGER + i) % 4 + 1]
       );
     END LOOP;
-    current_date := current_date + INTERVAL '1 day';
+    curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
 END $$;
 
 -- Generate historical shifts for December 2024 (Past Data Testing)
 DO $$
 DECLARE
-  current_date DATE := '2024-12-01';
+  -- Renamed current_date to curr_date
+  curr_date DATE := '2024-12-01';
   end_date DATE := '2024-12-31';
   shift_slots TEXT[] := ARRAY['AM', 'MID', 'PM'];
   shift_start_times TIME[] := ARRAY['08:00:00', '12:00:00', '16:00:00'];
   shift_end_times TIME[] := ARRAY['12:00:00', '16:00:00', '20:00:00'];
   i INTEGER;
 BEGIN
-  WHILE current_date <= end_date LOOP
+  WHILE curr_date <= end_date LOOP
     FOR i IN 1..3 LOOP
       INSERT INTO shifts (shift_date, slot, start_time, end_time, capacity)
       VALUES (
-        current_date,
+        curr_date,
         shift_slots[i],
         shift_start_times[i],
         shift_end_times[i],
         3
       );
     END LOOP;
-    current_date := current_date + INTERVAL '1 day';
+    curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
 END $$;

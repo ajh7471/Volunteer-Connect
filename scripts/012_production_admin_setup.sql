@@ -107,7 +107,8 @@ END $$;
 
 DO $$
 BEGIN
-  PERFORM seed_shifts_range(CURRENT_DATE, CURRENT_DATE + INTERVAL '90 days');
+  -- Cast the interval result to DATE to match function signature
+  PERFORM seed_shifts_range(CURRENT_DATE, (CURRENT_DATE + INTERVAL '90 days')::DATE);
   RAISE NOTICE '✓ Production shifts seeded for next 90 days';
 END $$;
 
