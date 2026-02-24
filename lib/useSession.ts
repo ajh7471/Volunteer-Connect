@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import type { AuthChangeEvent } from "@supabase/supabase-js"
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 type Role = "admin" | "volunteer"
 
