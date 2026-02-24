@@ -51,7 +51,7 @@ type Profile = {
 type EmailInsertResult = {
   error: any
   data: any
-  count: null
+  count: number | null
   status: number
   statusText: string
 }
