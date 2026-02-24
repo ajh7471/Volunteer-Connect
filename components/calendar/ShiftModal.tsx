@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Clock, Users, Calendar, Repeat } from "lucide-react"
+import { Loader2, Clock, Users, Calendar, Repeat, UserPlus, Share2 } from "lucide-react"
 import { getCapacityStatus, type ShiftWithCapacity, type RecurrencePattern } from "@/lib/shifts"
 import { parseDate, formatTime12Hour } from "@/lib/date"
 import { RecurringSignupModal } from "./RecurringSignupModal"
@@ -123,18 +123,50 @@ export function ShiftModal({
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : attendees && attendees.length > 0 ? (
-                    <div className="space-y-2">
-                      {attendees.map((attendee) => (
-                        <div key={attendee.id} className="flex items-center gap-3 text-sm">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-xs">
-                            {(attendee.name || "Unknown").charAt(0).toUpperCase()}
-                          </div>
-                          <span className={attendee.id === currentUserId ? "font-semibold" : ""}>
-                            {attendee.name || "Unknown"} {attendee.id === currentUserId && "(You)"}
-                          </span>
+                    <>
+                      {/* Sort: current user first, then alphabetically */}
+                      {[...attendees]
+                        .sort((a, b) => {
+                          if (a.id === currentUserId) return -1
+                          if (b.id === currentUserId) return 1
+                          return (a.name || "").localeCompare(b.name || "")
+                        })
+                        .map((attendee) => {
+                          const isYou = attendee.id === currentUserId
+                          return (
+                            <div key={attendee.id} className="flex items-center gap-3 text-sm">
+                              <div
+                                className={`h-8 w-8 rounded-full flex items-center justify-center font-medium text-xs shrink-0 ${
+                                  isYou
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-primary/10 text-primary"
+                                }`}
+                              >
+                                {(attendee.name || "?").charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className={isYou ? "font-semibold" : "font-medium"}>
+                                  {isYou ? "You" : ((attendee.name || "Unknown").split(" ")[0])}
+                                </span>
+                                {isYou && attendee.name && (
+                                  <span className="text-xs text-muted-foreground truncate">{attendee.name}</span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                      {/* "Tell a friend" prompt when user is the only volunteer */}
+                      {isAssigned && attendees.length === 1 && attendees[0].id === currentUserId && (
+                        <div className="mt-3 rounded-md bg-muted/50 p-3 text-center">
+                          <UserPlus className="h-5 w-5 mx-auto mb-1.5 text-muted-foreground" />
+                          <p className="text-xs font-medium">{"You're the only volunteer so far!"}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Tell a friend to join you on this shift
+                          </p>
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   ) : (
                     <div className="text-center py-4 text-sm text-muted-foreground">
                       No volunteers signed up yet. Be the first!
@@ -146,7 +178,7 @@ export function ShiftModal({
           </div>
 
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-2">
-            <Button variant="outline" onClick={onClose} className="w-full sm:w-auto bg-transparent">
+            <Button variant="outline" onClick={onClose} className="w-full sm:w-auto min-h-[44px] bg-transparent">
               Close
             </Button>
 
@@ -155,7 +187,7 @@ export function ShiftModal({
                 variant="destructive"
                 onClick={() => onRemove(shift.id)}
                 disabled={isSigningUp}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto min-h-[44px]"
               >
                 {isSigningUp ? (
                   <>
@@ -171,7 +203,7 @@ export function ShiftModal({
                 variant="secondary"
                 onClick={() => onJoinWaitlist(shift.id)}
                 disabled={isSigningUp}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto min-h-[44px]"
               >
                 {isSigningUp ? (
                   <>
@@ -184,7 +216,7 @@ export function ShiftModal({
               </Button>
             ) : (
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <Button onClick={() => onSignUp(shift.id)} disabled={isSigningUp} className="w-full sm:w-auto">
+                <Button onClick={() => onSignUp(shift.id)} disabled={isSigningUp} className="w-full sm:w-auto min-h-[44px]">
                   {isSigningUp ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -199,7 +231,7 @@ export function ShiftModal({
                     variant="secondary"
                     onClick={() => setShowRecurringModal(true)}
                     disabled={isSigningUp}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto min-h-[44px]"
                   >
                     <Repeat className="mr-2 h-4 w-4" />
                     Recurring

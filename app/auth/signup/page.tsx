@@ -34,6 +34,7 @@ export default function SignupPage() {
   // Basic account information
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
 
@@ -62,6 +63,12 @@ export default function SignupPage() {
     setError("") // Clear any previous error messages
     setLoading(true) // Show loading state on the submit button
 
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      setLoading(false)
+      return
+    }
+
     try {
       // STEP 1: Check if email is on the blocklist
       // This prevents banned email addresses from creating accounts
@@ -79,39 +86,26 @@ export default function SignupPage() {
       }
 
       // STEP 2: Create the user account with Supabase Auth
-      // This creates an entry in auth.users and triggers the profile creation
+      // Pass all profile data as user_metadata so the database trigger
+      // (handle_new_user) can auto-create the profile row with this data.
+      // This avoids RLS issues since the trigger runs with SECURITY DEFINER.
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // emailRedirectTo: Where to send the user after email verification
-          // Uses DEV override for local testing, otherwise uses current origin
           emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
+          data: {
+            name,
+            phone,
+            email_opt_in: emailOptIn,
+            email_categories: emailOptIn ? emailPreferences : null,
+          },
         },
       })
 
-      // If auth signup failed, throw the error to be caught below
       if (authError) throw authError
 
-      // STEP 3: Update the user's profile with additional information
-      // The profile is auto-created by database trigger when auth user is created
       if (authData.user) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({
-            name, // User's full name
-            phone, // Contact phone number
-            email_opt_in: emailOptIn, // Master email switch
-            email_categories: emailOptIn ? emailPreferences : null, // Only save prefs if opted in
-          })
-          .eq("id", authData.user.id) // Update the profile for this specific user
-
-        // Log profile errors but don't block signup (profile can be updated later)
-        if (profileError) {
-          console.error("Profile update error:", profileError)
-        }
-
-        // STEP 4: Show success message and redirect to volunteer dashboard
         toast.success("Account created! Please check your email to verify your account.")
         router.push("/volunteer")
       }
@@ -183,6 +177,23 @@ export default function SignupPage() {
                 required
                 minLength={6}
               />
+            </div>
+
+            {/* Confirm Password Input */}
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password *</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter your password"
+                required
+                minLength={6}
+              />
+              {password && confirmPassword && password !== confirmPassword && (
+                <p className="text-xs text-destructive">Passwords do not match</p>
+              )}
             </div>
 
             {/* Email Preferences Section */}
@@ -266,7 +277,7 @@ export default function SignupPage() {
             </div>
 
             {/* Submit Button - Disabled during loading */}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full min-h-[44px]" disabled={loading}>
               {loading ? "Creating Account..." : "Create Account"}
             </Button>
 

@@ -4,12 +4,13 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { useSessionRole } from "@/lib/useSession"
+import { useSession } from "@/lib/session/session-provider"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 
-function NavLink({ href, label, onClick }: { href: string; label: string; onClick?: () => void }) {
+function NavLink({ href, label, onClick, mobile }: { href: string; label: string; onClick?: () => void; mobile?: boolean }) {
   const pathname = usePathname()
   const active = pathname === href || (href !== "/" && pathname.startsWith(href))
   return (
@@ -17,8 +18,9 @@ function NavLink({ href, label, onClick }: { href: string; label: string; onClic
       href={href}
       onClick={onClick}
       className={[
-        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-        active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-accent",
+        "font-medium transition-colors rounded-md",
+        mobile ? "flex items-center px-4 py-3 text-base min-h-[44px]" : "px-3 py-2 text-sm",
+        active ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
       ].join(" ")}
     >
       {label}
@@ -29,6 +31,7 @@ function NavLink({ href, label, onClick }: { href: string; label: string; onClic
 export default function Header() {
   const r = useRouter()
   const { userId, role, loading } = useSessionRole()
+  const { logout: sessionLogout } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const { toast } = useToast()
@@ -37,26 +40,22 @@ export default function Header() {
     setSigningOut(true)
 
     try {
-      // Sign out from Supabase with global scope to clear all sessions
+      await sessionLogout("manual_logout")
+
       const { error } = await supabase.auth.signOut({ scope: "global" })
 
       if (error) {
         console.error("Supabase sign out error:", error)
-        // Continue with cleanup even if Supabase signOut fails
       }
 
-      // Clear all storage to ensure complete logout
       if (typeof window !== "undefined") {
         try {
-          // Clear sessionStorage (where auth tokens are now stored)
           sessionStorage.clear()
-          // Clear localStorage for any cached data
           localStorage.removeItem("volunteer-hub-cache")
-          // Clear any other potential auth-related items
           const keysToRemove: string[] = []
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i)
-            if (key && (key.includes("supabase") || key.includes("sb-"))) {
+            if (key && (key.includes("supabase") || key.includes("sb-") || key.includes("vh_"))) {
               keysToRemove.push(key)
             }
           }
@@ -66,7 +65,6 @@ export default function Header() {
         }
       }
 
-      // Use hard redirect to fully reload the page and clear any in-memory state
       window.location.href = "/"
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
@@ -82,14 +80,14 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 border-b border-primary/10 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link
             href={userId ? (role === "admin" ? "/admin" : "/volunteer") : "/"}
-            className="text-xl font-bold text-foreground"
+            className="text-xl font-bold tracking-tight text-foreground hover:text-primary transition-colors"
           >
-            Volunteer Hub
+            Volunteer Connect
           </Link>
 
           {/* Desktop Navigation */}
@@ -102,22 +100,22 @@ export default function Header() {
           </nav>
 
           {/* Desktop Auth Buttons */}
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-3 md:flex">
             {loading || signingOut ? (
               <span className="text-sm text-muted-foreground">{signingOut ? "Signing out..." : "Loading..."}</span>
             ) : userId ? (
-              <Button onClick={signOut} variant="default" size="sm" disabled={signingOut}>
+              <Button onClick={signOut} variant="outline" size="sm" disabled={signingOut} className="font-medium">
                 Sign Out
               </Button>
             ) : (
               <>
-                <Button asChild variant="ghost" size="sm">
+                <Button asChild variant="ghost" size="sm" className="font-medium">
                   <Link href="/">Login</Link>
                 </Button>
-                <Button asChild variant="default" size="sm">
+                <Button asChild variant="default" size="sm" className="font-medium shadow-lg shadow-primary/20">
                   <Link href="/auth/signup">Sign Up</Link>
                 </Button>
-                <Button asChild variant="ghost" size="sm">
+                <Button asChild variant="ghost" size="sm" className="font-medium">
                   <Link href="/about">About</Link>
                 </Button>
               </>
@@ -125,35 +123,40 @@ export default function Header() {
           </div>
 
           {/* Mobile Menu Button */}
-          <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
+          <button
+            className="flex h-11 w-11 items-center justify-center rounded-md md:hidden hover:bg-accent/50 transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+          >
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <nav className="flex flex-col gap-2 py-4 md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-primary/10 py-4 md:hidden">
             {userId && role === "volunteer" && (
-              <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} />
+              <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} mobile />
             )}
-            {userId && <NavLink href="/calendar" label="Calendar" onClick={() => setMobileMenuOpen(false)} />}
-            {userId && <NavLink href="/my-schedule" label="My Schedule" onClick={() => setMobileMenuOpen(false)} />}
-            {userId && <NavLink href="/profile" label="Profile" onClick={() => setMobileMenuOpen(false)} />}
-            {role === "admin" && <NavLink href="/admin" label="Admin" onClick={() => setMobileMenuOpen(false)} />}
-            <div className="mt-2 flex flex-col gap-2">
+            {userId && <NavLink href="/calendar" label="Calendar" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && <NavLink href="/my-schedule" label="My Schedule" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && <NavLink href="/profile" label="Profile" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {role === "admin" && <NavLink href="/admin" label="Admin" onClick={() => setMobileMenuOpen(false)} mobile />}
+            <div className="mt-3 flex flex-col gap-2 border-t border-primary/10 pt-3">
               {userId ? (
-                <Button onClick={signOut} variant="default" size="sm" className="w-full" disabled={signingOut}>
+                <Button onClick={signOut} variant="outline" className="w-full min-h-[44px] font-medium" disabled={signingOut}>
                   {signingOut ? "Signing out..." : "Sign Out"}
                 </Button>
               ) : (
                 <>
-                  <Button asChild variant="ghost" size="sm" className="w-full">
+                  <Button asChild variant="ghost" className="w-full min-h-[44px] font-medium">
                     <Link href="/">Login</Link>
                   </Button>
-                  <Button asChild variant="default" size="sm" className="w-full">
+                  <Button asChild variant="default" className="w-full min-h-[44px] font-medium shadow-lg shadow-primary/20">
                     <Link href="/auth/signup">Sign Up</Link>
                   </Button>
-                  <Button asChild variant="ghost" size="sm" className="w-full">
+                  <Button asChild variant="ghost" className="w-full min-h-[44px] font-medium">
                     <Link href="/about">About</Link>
                   </Button>
                 </>

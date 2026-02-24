@@ -1,6 +1,6 @@
 "use client"
 
-import { isSameDay, isSameMonth } from "@/lib/date"
+import { isSameDay, isSameMonth, ymd } from "@/lib/date"
 import { ShiftIndicator } from "./ShiftIndicator"
 import type { ShiftWithCapacity } from "@/lib/shifts"
 
@@ -31,8 +31,8 @@ export function DayCell({
   const isCurrentMonth = isSameMonth(date, currentMonth)
   const isPastDay = cellDate < today // Check if this day is in the past
 
-  // Get shifts for this date
-  const dateStr = date.toISOString().split("T")[0]
+  // Get shifts for this date - use ymd() to avoid timezone offset bugs with toISOString()
+  const dateStr = ymd(date)
   const dayShifts = shifts.filter((s: ShiftWithCapacity) => s.shift_date === dateStr)
 
   const now = new Date()
@@ -69,13 +69,13 @@ export function DayCell({
     <div
       className={`min-h-20 border-b border-r p-1 sm:min-h-24 sm:p-2 ${
         !isCurrentMonth ? "bg-muted/30" : "bg-background"
-      } ${isToday ? "bg-blue-50 dark:bg-blue-950" : ""} ${
+      } ${isToday ? "bg-primary/5 ring-1 ring-inset ring-primary/20" : ""} ${
         isPastDay ? "bg-muted/50 cursor-not-allowed opacity-60" : "hover:bg-accent cursor-pointer"
       } transition-colors`}
       onClick={handleClick}
     >
       <div
-        className={`text-sm font-medium ${!isCurrentMonth || isPastDay ? "text-muted-foreground" : ""} ${isToday ? "text-blue-600 dark:text-blue-400 font-bold" : ""}`}
+        className={`text-sm font-medium ${!isCurrentMonth || isPastDay ? "text-muted-foreground" : ""} ${isToday ? "text-primary font-bold" : ""}`}
       >
         {date.getDate()}
       </div>

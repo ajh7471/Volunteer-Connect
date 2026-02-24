@@ -61,12 +61,13 @@ export function ShiftIndicator({
   return (
     <button
       onClick={handleClick}
-      className={`${statusColors[status]} group relative flex h-6 w-full items-center justify-center rounded text-xs font-medium text-white transition-colors`}
+      className={`${statusColors[status]} group relative flex min-h-[28px] w-full items-center justify-center rounded text-xs font-medium text-white transition-colors`}
       title={`${timeLabel}: ${assignmentsCount}/${capacity} - ${statusLabels[status]}`}
+      aria-label={`${slot} shift ${timeLabel}: ${assignmentsCount} of ${capacity} spots filled - ${statusLabels[status]}`}
     >
       <span className="hidden sm:inline">{timeLabel}</span>
-      <span className="sm:hidden">•</span>
-      <span className="absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white group-hover:block">
+      <span className="sm:hidden text-[10px]">{slot}</span>
+      <span className="absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-popover text-popover-foreground px-2 py-1 text-xs shadow-md group-hover:block">
         {timeLabel}: {assignmentsCount}/{capacity}
       </span>
     </button>

@@ -29,18 +29,18 @@ export default function AdminDashboard() {
 
     const checkAdmin = async () => {
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
 
         if (!mounted) return
 
-        if (sessionError || !sessionData.session) {
+        if (userError || !user) {
           adminCheckCompleted.current = true
           setIsAdmin(false)
           clearTimeout(loadTimeout)
           return
         }
 
-        const uid = sessionData.session.user.id
+        const uid = user.id
 
         const { data, error: profileError } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()
 
@@ -108,16 +108,15 @@ export default function AdminDashboard() {
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>{error || "You need admin privileges to access this page."}</CardDescription>
           </CardHeader>
-          <CardContent className="flex gap-2">
-            <Button onClick={() => router.push("/calendar")}>Go to Calendar</Button>
-            <Button variant="outline" onClick={() => window.location.reload()}>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button className="min-h-[44px]" onClick={() => router.push("/calendar")}>Go to Calendar</Button>
+            <Button className="min-h-[44px]" variant="outline" onClick={() => window.location.reload()}>
               Refresh Page
             </Button>
             <Button
               variant="ghost"
-              onClick={() => {
-                sessionStorage.clear()
-                localStorage.clear()
+              onClick={async () => {
+                await supabase.auth.signOut()
                 window.location.href = "/"
               }}
             >
@@ -152,110 +151,113 @@ export default function AdminDashboard() {
 
         {/* Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card>
+          <Card className="border-primary/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Volunteers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Volunteers</CardTitle>
+              <Users className="h-5 w-5 text-primary/60" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.volunteers}</div>
+              <div className="text-3xl font-bold tracking-tight">{stats.volunteers}</div>
+              <p className="text-xs text-muted-foreground mt-1">Registered accounts</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-primary/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Shifts</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Shifts</CardTitle>
+              <Calendar className="h-5 w-5 text-primary/60" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.shifts}</div>
+              <div className="text-3xl font-bold tracking-tight">{stats.shifts}</div>
+              <p className="text-xs text-muted-foreground mt-1">Available opportunities</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-primary/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Assignments</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Assignments</CardTitle>
+              <FileText className="h-5 w-5 text-primary/60" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.assignments}</div>
+              <div className="text-3xl font-bold tracking-tight">{stats.assignments}</div>
+              <p className="text-xs text-muted-foreground mt-1">Total commitments</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Admin Actions */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="transition-shadow hover:shadow-lg">
+          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
             <CardHeader>
-              <UserCog className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Create users, manage roles, and block emails</CardDescription>
+              <UserCog className="mb-3 h-9 w-9 text-primary/80" />
+              <CardTitle className="text-lg">User Management</CardTitle>
+              <CardDescription className="text-sm">Create users, manage roles, and block emails</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild className="w-full">
+              <Button asChild className="w-full min-h-[44px] font-medium">
                 <Link href="/admin/users">Manage Users</Link>
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="transition-shadow hover:shadow-lg">
+          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
             <CardHeader>
-              <Users className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Manage Volunteers</CardTitle>
-              <CardDescription>View, edit, and manage volunteer accounts</CardDescription>
+              <Users className="mb-3 h-9 w-9 text-primary/80" />
+              <CardTitle className="text-lg">Manage Volunteers</CardTitle>
+              <CardDescription className="text-sm">View, edit, and manage volunteer accounts</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild className="w-full">
+              <Button asChild className="w-full min-h-[44px] font-medium">
                 <Link href="/admin/volunteers">View Volunteers</Link>
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="transition-shadow hover:shadow-lg">
+          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
             <CardHeader>
-              <Calendar className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Manage Shifts</CardTitle>
-              <CardDescription>Create shifts and assign volunteers to slots</CardDescription>
+              <Calendar className="mb-3 h-9 w-9 text-primary/80" />
+              <CardTitle className="text-lg">Manage Shifts</CardTitle>
+              <CardDescription className="text-sm">Create shifts and assign volunteers to slots</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild className="w-full">
+              <Button asChild className="w-full min-h-[44px] font-medium">
                 <Link href="/admin/shifts">Manage Shifts</Link>
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="transition-shadow hover:shadow-lg">
+          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
             <CardHeader>
-              <Mail className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Email Communications</CardTitle>
-              <CardDescription>Send emails to opted-in volunteers</CardDescription>
+              <Mail className="mb-3 h-9 w-9 text-primary/80" />
+              <CardTitle className="text-lg">Email Communications</CardTitle>
+              <CardDescription className="text-sm">Send emails to opted-in volunteers</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild variant="outline" className="w-full bg-transparent">
+              <Button asChild variant="outline" className="w-full min-h-[44px] font-medium">
                 <Link href="/admin/emails">Manage Emails</Link>
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="transition-shadow hover:shadow-lg">
+          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
             <CardHeader>
-              <FileText className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>View Reports</CardTitle>
-              <CardDescription>Analytics and volunteer activity reports</CardDescription>
+              <FileText className="mb-3 h-9 w-9 text-primary/80" />
+              <CardTitle className="text-lg">View Reports</CardTitle>
+              <CardDescription className="text-sm">Analytics and volunteer activity reports</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild variant="outline" className="w-full bg-transparent">
+              <Button asChild variant="outline" className="w-full min-h-[44px] font-medium">
                 <Link href="/admin/reports">View Reports</Link>
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="transition-shadow hover:shadow-lg">
+          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
             <CardHeader>
-              <Settings className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Settings</CardTitle>
-              <CardDescription>Configure system settings and preferences</CardDescription>
+              <Settings className="mb-3 h-9 w-9 text-primary/80" />
+              <CardTitle className="text-lg">Settings</CardTitle>
+              <CardDescription className="text-sm">Configure system settings and preferences</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild variant="outline" className="w-full bg-transparent">
+              <Button asChild variant="outline" className="w-full min-h-[44px] font-medium">
                 <Link href="/admin/settings">Settings</Link>
               </Button>
             </CardContent>

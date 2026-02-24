@@ -354,14 +354,14 @@ export default function MySchedulePage() {
             <h1 className="text-3xl font-bold tracking-tight">My Schedule</h1>
             <p className="text-muted-foreground">View and manage your upcoming shifts</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {upcoming.length > 0 && (
-              <Button variant="outline" onClick={handleAddAllToCalendar}>
+              <Button variant="outline" className="min-h-[44px]" onClick={handleAddAllToCalendar}>
                 <CalendarPlus className="mr-2 h-4 w-4" />
                 Add All to Calendar
               </Button>
             )}
-            <Button asChild>
+            <Button asChild className="min-h-[44px]">
               <Link href="/calendar">Browse Calendar</Link>
             </Button>
           </div>
@@ -403,13 +403,13 @@ export default function MySchedulePage() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {entry.status === "notified" && (
-                          <Button size="sm" onClick={() => handleAcceptWaitlist(entry.id)}>
+                          <Button size="sm" className="min-h-[44px]" onClick={() => handleAcceptWaitlist(entry.id)}>
                             Accept Shift
                           </Button>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => handleLeaveWaitlist(entry.id)}>
+                        <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => handleLeaveWaitlist(entry.id)}>
                           Leave Waitlist
                         </Button>
                       </div>
@@ -513,7 +513,7 @@ export default function MySchedulePage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full bg-transparent"
+                      className="w-full min-h-[44px] bg-transparent"
                       onClick={() => handleAddToCalendar(assignment)}
                     >
                       <CalendarPlus className="mr-2 h-4 w-4" />
@@ -522,10 +522,10 @@ export default function MySchedulePage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full bg-transparent"
+                      className="w-full min-h-[44px] bg-transparent text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleCancel(assignment.id)}
                     >
-                      Cancel
+                      Cancel Shift
                     </Button>
                   </CardContent>
                 </Card>

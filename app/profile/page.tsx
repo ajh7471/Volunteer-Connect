@@ -112,16 +112,31 @@ export default function ProfilePage() {
     setSaving(false)
   }
 
-  async function handleChangePassword() {
-    const { error } = await supabase.auth.updateUser({
-      password: prompt("Enter new password:") || "",
-    })
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
 
+  async function handleChangePassword() {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match")
+      return
+    }
+    setChangingPassword(true)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) {
-      toast.error("Failed to change password")
+      toast.error("Failed to change password: " + error.message)
     } else {
       toast.success("Password updated successfully!")
+      setNewPassword("")
+      setConfirmPassword("")
+      setShowPasswordForm(false)
     }
+    setChangingPassword(false)
   }
 
   function getCalendarSyncUrl() {
@@ -399,12 +414,60 @@ export default function ProfilePage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Password</Label>
-                  <div className="flex gap-2">
-                    <Input type="password" value="••••••••" disabled className="bg-muted" />
-                    <Button variant="outline" onClick={handleChangePassword}>
-                      Change
-                    </Button>
-                  </div>
+                  {!showPasswordForm ? (
+                    <div className="flex gap-2">
+                      <Input type="password" value="********" disabled className="bg-muted" />
+                      <Button variant="outline" onClick={() => setShowPasswordForm(true)}>
+                        Change
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 rounded-lg border p-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="new-password">New Password</Label>
+                        <Input
+                          id="new-password"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Minimum 6 characters"
+                          minLength={6}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password">Confirm Password</Label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm your new password"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={handleChangePassword} disabled={changingPassword}>
+                          {changingPassword ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            "Update Password"
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowPasswordForm(false)
+                            setNewPassword("")
+                            setConfirmPassword("")
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-lg border p-4">
@@ -412,11 +475,7 @@ export default function ProfilePage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Last login</span>
-                      <Badge variant="outline">Just now</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Account created</span>
-                      <Badge variant="outline">{profile && new Date(profile.id).toLocaleDateString()}</Badge>
+                      <Badge variant="outline">Current session</Badge>
                     </div>
                   </div>
                 </div>

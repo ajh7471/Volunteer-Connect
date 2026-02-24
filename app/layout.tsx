@@ -1,25 +1,31 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import "./globals.css"
 import ToastContainer from "./components/ToastContainer"
 import ClientLayout from "@/components/client-layout"
 
 const inter = Inter({
-  variable: "--font-geist-sans",
+  variable: "--font-inter",
   subsets: ["latin"],
 })
 
 const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-geist-mono",
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 })
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#db2777",
+}
+
 export const metadata: Metadata = {
-  title: "Volunteer Hub",
-  description: "Coordinate volunteer shifts with ease",
+  title: "Volunteer Hub - Vanderpump Dogs",
+  description: "Coordinate volunteer shifts at Vanderpump Dogs with ease. Sign up for shifts, manage your schedule, and connect with fellow volunteers.",
   manifest: "/manifest.json",
-  themeColor: "#8B5CF6",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -34,8 +40,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${jetbrainsMono.variable} min-h-dvh bg-background font-sans antialiased`}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} bg-background antialiased`}>
+      <body className="min-h-dvh bg-background font-sans">
         <ClientLayout>{children}</ClientLayout>
         <ToastContainer />
       </body>

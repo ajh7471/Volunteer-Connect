@@ -41,8 +41,8 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const { data } = await supabase.auth.getSession()
-      setUserId(data.session?.user?.id || null)
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserId(user?.id || null)
     }
     loadUser()
   }, [])
@@ -55,19 +55,19 @@ export default function CalendarPage() {
 
     setLoading(true)
 
-    const [monthShifts, assignmentsResult] = await Promise.all([
-      getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth()),
-      (async () => {
-        const shiftIds = (await getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth())).map((s) => s.id)
-        if (shiftIds.length === 0) return { data: [] }
-        return supabase.from("shift_assignments").select("shift_id").eq("user_id", userId).in("shift_id", shiftIds)
-      })(),
-    ])
-
+    // Fetch shifts first (uses cache), then use the IDs to fetch user assignments
+    const monthShifts = await getMonthShifts(currentMonth.getFullYear(), currentMonth.getMonth())
     setShifts(monthShifts)
 
-    if (assignmentsResult.data) {
-      setUserAssignments(new Set(assignmentsResult.data.map((a: { shift_id: string }) => a.shift_id)))
+    if (monthShifts.length > 0) {
+      const shiftIds = monthShifts.map((s) => s.id)
+      const { data } = await supabase
+        .from("shift_assignments")
+        .select("shift_id")
+        .eq("user_id", userId)
+        .in("shift_id", shiftIds)
+
+      setUserAssignments(new Set((data || []).map((a: { shift_id: string }) => a.shift_id)))
     } else {
       setUserAssignments(new Set())
     }
@@ -106,8 +106,8 @@ export default function CalendarPage() {
     loadShiftAttendees(shift.id)
   }
 
-  async function loadShiftAttendees(shiftId: string) {
-    if (shiftAttendees[shiftId] || loadingAttendees.has(shiftId)) return
+  async function loadShiftAttendees(shiftId: string, forceRefresh = false) {
+    if (!forceRefresh && shiftAttendees[shiftId] || loadingAttendees.has(shiftId)) return
 
     setLoadingAttendees((prev) => new Set(prev).add(shiftId))
 
@@ -162,8 +162,14 @@ export default function CalendarPage() {
       toast.success("Successfully signed up for shift!")
       invalidateShiftCache(currentMonth.getFullYear(), currentMonth.getMonth())
       await loadMonthData()
-      setIsModalOpen(false)
-      setSelectedDate(null)
+      // Update selectedShift to reflect new assignments_count
+      setSelectedShift((prev) =>
+        prev?.id === shiftId
+          ? { ...prev, assignments_count: prev.assignments_count + 1 }
+          : prev
+      )
+      // Refresh attendees to show updated volunteer list (including "You")
+      await loadShiftAttendees(shiftId, true)
     } else {
       toast.error(result.error || "Failed to sign up")
     }
@@ -197,6 +203,8 @@ export default function CalendarPage() {
         toast.success("Signup cancelled successfully")
         invalidateShiftCache(currentMonth.getFullYear(), currentMonth.getMonth())
         await loadMonthData()
+        // Refresh attendees and close modal after removal
+        await loadShiftAttendees(shiftId, true)
         setIsModalOpen(false)
         setSelectedDate(null)
       }
@@ -323,30 +331,19 @@ export default function CalendarPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Shift Status Legend</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-12 rounded bg-green-500"></div>
-              <span className="text-sm">Available</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-12 rounded bg-orange-500"></div>
-              <span className="text-sm">Nearly Full</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-12 rounded bg-red-500"></div>
-              <span className="text-sm">Full</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-12 rounded bg-gray-300"></div>
-              <span className="text-sm">Not Available</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-12 rounded bg-blue-600"></div>
-              <span className="text-sm">Registered</span>
-            </div>
+          <CardContent className="flex flex-wrap gap-x-4 gap-y-2 py-3 px-4">
+            {[
+              { color: "bg-green-500", label: "Available" },
+              { color: "bg-orange-500", label: "Nearly Full" },
+              { color: "bg-red-500", label: "Full" },
+              { color: "bg-gray-300 dark:bg-gray-600", label: "Not Available" },
+              { color: "bg-blue-600", label: "Registered" },
+            ].map(({ color, label }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <div className={`h-3 w-6 rounded-sm ${color}`} />
+                <span className="text-xs text-muted-foreground">{label}</span>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
@@ -466,14 +463,23 @@ export default function CalendarPage() {
                                 ) : (
                                   <>
                                     <p className="text-xs font-medium text-muted-foreground mb-1.5">Team Members:</p>
-                                    {attendees.map((attendee) => (
-                                      <div key={attendee.id} className="text-xs flex items-center gap-2 py-1">
-                                        <div className="h-2 w-2 rounded-full bg-primary"></div>
-                                        <span className="font-medium">
-                                          {attendee.id === userId ? `${attendee.name} (You)` : attendee.name}
-                                        </span>
-                                      </div>
-                                    ))}
+                                    {[...attendees]
+                                      .sort((a, b) => {
+                                        if (a.id === userId) return -1
+                                        if (b.id === userId) return 1
+                                        return (a.name || "").localeCompare(b.name || "")
+                                      })
+                                      .map((attendee) => {
+                                        const isYou = attendee.id === userId
+                                        return (
+                                          <div key={attendee.id} className="text-xs flex items-center gap-2 py-1">
+                                            <div className={`h-2 w-2 rounded-full ${isYou ? "bg-primary" : "bg-primary/60"}`} />
+                                            <span className={isYou ? "font-semibold" : "font-medium"}>
+                                              {isYou ? "You" : ((attendee.name || "Unknown").split(" ")[0])}
+                                            </span>
+                                          </div>
+                                        )
+                                      })}
                                   </>
                                 )}
                               </div>
