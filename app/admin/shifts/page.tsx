@@ -57,8 +57,6 @@ export default function AdminShiftsPage() {
   async function loadData() {
     setLoading(true)
     
-    console.log("[v0] Loading shifts for date:", selectedDate)
-
     const { data: shiftsData } = await supabase
       .from("shifts")
       .select("*")
@@ -99,10 +97,8 @@ export default function AdminShiftsPage() {
           (user: { role: string; active: boolean | null }) => 
             user.role === 'volunteer' && (user.active === true || user.active === null)
         )
-        console.log("[v0] Active volunteers loaded:", activeVolunteers.length)
         setVolunteers(activeVolunteers as Volunteer[])
       } else {
-        console.log("[v0] Failed to load volunteers:", volunteersResult.error)
         setVolunteers([])
       }
     } else {
@@ -116,10 +112,8 @@ export default function AdminShiftsPage() {
           (user: { role: string; active: boolean | null }) => 
             user.role === 'volunteer' && (user.active === true || user.active === null)
         )
-        console.log("[v0] Active volunteers loaded (no shifts):", activeVolunteers.length)
         setVolunteers(activeVolunteers as Volunteer[])
       } else {
-        console.log("[v0] Failed to load volunteers (no shifts):", volunteersResult.error)
         setVolunteers([])
       }
     }
@@ -136,6 +130,7 @@ export default function AdminShiftsPage() {
     const { error } = await supabase.rpc("seed_shifts_range", {
       start_date: startDate,
       end_date: endDate,
+      cap: 2,
     })
 
     if (error) {

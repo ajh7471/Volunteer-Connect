@@ -19,7 +19,10 @@ export function addMonths(d: Date, n: number) {
 export function daysInGrid(d: Date) {
   const start = startOfMonth(d),
     end = endOfMonth(d)
-  const startWeekday = (start.getDay() + 6) % 7
+  // start.getDay() returns 0=Sun,1=Mon,...,6=Sat which matches the
+  // Sun-first WEEKDAYS header in MonthlyGrid. The old formula
+  // `(getDay()+6)%7` converted to Mon-first, causing a 1-day offset.
+  const startWeekday = start.getDay()
   const cells: Date[] = []
 
   for (let i = 0; i < startWeekday; i++) {

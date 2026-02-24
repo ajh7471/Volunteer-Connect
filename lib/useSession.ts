@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
+import type { AuthChangeEvent } from "@supabase/supabase-js"
 
 type Role = "admin" | "volunteer"
 
@@ -18,38 +18,30 @@ export function useSessionRole() {
   useEffect(() => {
     let mounted = true
 
-    const loadTimeout = setTimeout(() => {
-      if (mounted && !loadCompleted.current) {
-        console.warn("[v0] Session load timeout - clearing state")
-        setUserId(null)
-        setRole(null)
-        setLoading(false)
-      }
-    }, 3000)
-
     async function load(shouldSetLoading = true) {
       if (shouldSetLoading) setLoading(true)
 
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        // Use getSession() instead of getUser() to avoid network requests
+        // that throw "Load failed" in WebKit iframe sandboxes (v0 preview).
+        // getSession() reads from local storage -- no fetch, no lock, no abort.
+        const { data: { session } } = await supabase.auth.getSession()
 
         if (!mounted) return
 
-        if (sessionError || !sessionData.session) {
+        if (!session?.user) {
           loadCompleted.current = true
-          clearTimeout(loadTimeout)
           setUserId(null)
           setRole(null)
           setLoading(false)
           return
         }
 
-        const uid = sessionData.session.user.id
+        const uid = session.user.id
         setUserId(uid)
 
         if (cachedRole && cachedRole.userId === uid && Date.now() - cachedRole.timestamp < ROLE_CACHE_TTL) {
           loadCompleted.current = true
-          clearTimeout(loadTimeout)
           setRole(cachedRole.role)
           setLoading(false)
           return
@@ -60,26 +52,21 @@ export function useSessionRole() {
         if (!mounted) return
 
         loadCompleted.current = true
-        clearTimeout(loadTimeout)
 
         if (error) {
-          console.error("[v0] Error fetching role:", error)
           setRole("volunteer")
           setLoading(false)
           return
         }
 
         const userRole = (data?.role as Role) || "volunteer"
-
         cachedRole = { userId: uid, role: userRole, timestamp: Date.now() }
-
         setRole(userRole)
         setLoading(false)
-      } catch (error) {
-        console.error("[v0] Session load error:", error)
+      } catch {
+        // getSession() should never throw, but if it does, degrade gracefully
         if (mounted) {
           loadCompleted.current = true
-          clearTimeout(loadTimeout)
           setUserId(null)
           setRole(null)
           setLoading(false)
@@ -115,7 +102,6 @@ export function useSessionRole() {
     return () => {
       mounted = false
       subscription.unsubscribe()
-      clearTimeout(loadTimeout)
     }
   }, [])
 

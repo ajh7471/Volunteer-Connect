@@ -11,6 +11,7 @@ type MonthlyGridProps = {
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const WEEKDAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"]
 
 export function MonthlyGrid({ currentMonth, shifts, userAssignments, onDayClick, onShiftClick }: MonthlyGridProps) {
   const days = daysInGrid(currentMonth)
@@ -19,9 +20,11 @@ export function MonthlyGrid({ currentMonth, shifts, userAssignments, onDayClick,
     <div className="overflow-hidden rounded-lg border">
       {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b bg-muted">
-        {WEEKDAYS.map((day) => (
+        {WEEKDAYS.map((day, i) => (
           <div key={day} className="p-2 text-center text-sm font-semibold">
-            {day}
+            <span className="hidden sm:inline">{day}</span>
+            <span className="sm:hidden" aria-hidden="true">{WEEKDAYS_SHORT[i]}</span>
+            <span className="sr-only sm:hidden">{day}</span>
           </div>
         ))}
       </div>

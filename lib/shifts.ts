@@ -44,16 +44,13 @@ export async function getMonthShifts(year: number, month: number, bypassCache = 
   const startDate = ymd(new Date(year, month, 1))
   const endDate = ymd(new Date(year, month + 1, 0))
 
-  const [shiftsResult, assignmentsResult] = await Promise.all([
-    supabase
-      .from("shifts")
-      .select("id, shift_date, slot, start_time, end_time, capacity")
-      .gte("shift_date", startDate)
-      .lte("shift_date", endDate)
-      .order("shift_date", { ascending: true })
-      .order("slot", { ascending: true }),
-    supabase.from("shift_assignments").select("shift_id"),
-  ])
+  const shiftsResult = await supabase
+    .from("shifts")
+    .select("id, shift_date, slot, start_time, end_time, capacity")
+    .gte("shift_date", startDate)
+    .lte("shift_date", endDate)
+    .order("shift_date", { ascending: true })
+    .order("slot", { ascending: true })
 
   if (shiftsResult.error) {
     console.error("[v0] Error fetching month shifts:", shiftsResult.error)
@@ -65,16 +62,19 @@ export async function getMonthShifts(year: number, month: number, bypassCache = 
     return []
   }
 
-  const shiftIds = new Set(shifts.map((s: { id: string }) => s.id))
+  const shiftIds = shifts.map((s: { id: string }) => s.id)
 
-  // Create a map of shift_id -> count from assignments that match our shifts
+  // Only fetch assignments for this month's shifts instead of ALL assignments
+  const assignmentsResult = await supabase
+    .from("shift_assignments")
+    .select("shift_id")
+    .in("shift_id", shiftIds)
+
   const assignmentCounts = new Map<string, number>()
   if (assignmentsResult.data) {
     assignmentsResult.data.forEach((a: { shift_id: string }) => {
-      if (shiftIds.has(a.shift_id)) {
-        const current = assignmentCounts.get(a.shift_id) || 0
-        assignmentCounts.set(a.shift_id, current + 1)
-      }
+      const current = assignmentCounts.get(a.shift_id) || 0
+      assignmentCounts.set(a.shift_id, current + 1)
     })
   }
 
@@ -136,7 +136,11 @@ export async function signUpForShift(shiftId: string, userId: string): Promise<{
   }
 
   // Check capacity
-  const { data: shift } = await supabase.from("shifts").select("capacity").eq("id", shiftId).single()
+  const { data: shift } = await supabase
+    .from("shifts")
+    .select("capacity, shift_date")
+    .eq("id", shiftId)
+    .single()
 
   const { count } = await supabase
     .from("shift_assignments")
@@ -155,30 +159,47 @@ export async function signUpForShift(shiftId: string, userId: string): Promise<{
     return { success: false, error: error.message }
   }
 
-  // Invalidate cache for the shift's month
-  const shiftDate = new Date(shiftId) // Assuming shiftId is a date string
-  invalidateShiftCache(shiftDate.getFullYear(), shiftDate.getMonth() + 1)
+  // Invalidate cache for the shift's month using actual shift_date
+  if (shift?.shift_date) {
+    const d = new Date(shift.shift_date + "T00:00:00")
+    invalidateShiftCache(d.getFullYear(), d.getMonth())
+  } else {
+    invalidateShiftCache()
+  }
 
   return { success: true }
 }
 
 export async function cancelShiftSignup(assignmentId: string): Promise<{ success: boolean; error?: string }> {
-  const { error } = await supabase.from("shift_assignments").delete().eq("id", assignmentId)
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  // Invalidate cache for the shift's month
+  // Fetch the assignment's shift_id BEFORE deleting so we can invalidate cache
   const { data: assignment } = await supabase
     .from("shift_assignments")
     .select("shift_id")
     .eq("id", assignmentId)
     .single()
 
-  if (assignment) {
-    const shiftDate = new Date(assignment.shift_id) // Assuming shiftId is a date string
-    invalidateShiftCache(shiftDate.getFullYear(), shiftDate.getMonth() + 1)
+  const { error } = await supabase.from("shift_assignments").delete().eq("id", assignmentId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  // Invalidate cache for the shift's month using actual shift date
+  if (assignment?.shift_id) {
+    const { data: shift } = await supabase
+      .from("shifts")
+      .select("shift_date")
+      .eq("id", assignment.shift_id)
+      .single()
+
+    if (shift?.shift_date) {
+      const d = new Date(shift.shift_date + "T00:00:00")
+      invalidateShiftCache(d.getFullYear(), d.getMonth())
+    } else {
+      invalidateShiftCache()
+    }
+  } else {
+    invalidateShiftCache()
   }
 
   return { success: true }

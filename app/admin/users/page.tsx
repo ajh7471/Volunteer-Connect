@@ -61,6 +61,7 @@ export default function AdminUsersPage() {
   const [newUser, setNewUser] = useState({
     email: "",
     password: "",
+    confirmPassword: "",
     name: "",
     phone: "",
     role: "volunteer",
@@ -129,6 +130,11 @@ export default function AdminUsersPage() {
       return
     }
 
+    if (newUser.password !== newUser.confirmPassword) {
+      toast.error("Passwords do not match")
+      return
+    }
+
     if (blockedEmails.includes(newUser.email.toLowerCase())) {
       toast.error("This email address is blocked")
       return
@@ -142,7 +148,7 @@ export default function AdminUsersPage() {
     if (result.success) {
       toast.success(`User ${newUser.name} created successfully`)
       setShowCreateModal(false)
-      setNewUser({ email: "", password: "", name: "", phone: "", role: "volunteer" })
+      setNewUser({ email: "", password: "", confirmPassword: "", name: "", phone: "", role: "volunteer" })
       loadUsers()
     } else {
       toast.error(result.error || "Failed to create user")
@@ -407,6 +413,19 @@ export default function AdminUsersPage() {
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-confirm-password">Confirm Password *</Label>
+                <Input
+                  id="new-confirm-password"
+                  type="password"
+                  value={newUser.confirmPassword}
+                  onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
+                  placeholder="Re-enter password"
+                />
+                {newUser.password && newUser.confirmPassword && newUser.password !== newUser.confirmPassword && (
+                  <p className="text-xs text-destructive">Passwords do not match</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-role">Role</Label>

@@ -35,25 +35,25 @@ export default function ToastContainer() {
         <div
           key={toast.id}
           className={`
-            flex items-start gap-3 p-4 rounded-lg shadow-lg animate-in slide-in-from-bottom-5
-            ${toast.type === "success" ? "bg-green-50 border border-green-200" : ""}
-            ${toast.type === "error" ? "bg-red-50 border border-red-200" : ""}
-            ${toast.type === "info" ? "bg-blue-50 border border-blue-200" : ""}
-            ${toast.type === "warning" ? "bg-yellow-50 border border-yellow-200" : ""}
+            flex items-start gap-3 p-4 rounded-lg shadow-lg animate-in slide-in-from-bottom-5 border
+            ${toast.type === "success" ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800" : ""}
+            ${toast.type === "error" ? "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800" : ""}
+            ${toast.type === "info" ? "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800" : ""}
+            ${toast.type === "warning" ? "bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800" : ""}
           `}
         >
-          {toast.type === "success" && <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />}
-          {toast.type === "error" && <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />}
-          {toast.type === "info" && <Info className="h-5 w-5 text-blue-600 flex-shrink-0" />}
-          {toast.type === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />}
+          {toast.type === "success" && <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />}
+          {toast.type === "error" && <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />}
+          {toast.type === "info" && <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />}
+          {toast.type === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />}
 
           <p
             className={`
             text-sm flex-1
-            ${toast.type === "success" ? "text-green-900" : ""}
-            ${toast.type === "error" ? "text-red-900" : ""}
-            ${toast.type === "info" ? "text-blue-900" : ""}
-            ${toast.type === "warning" ? "text-yellow-900" : ""}
+            ${toast.type === "success" ? "text-green-900 dark:text-green-100" : ""}
+            ${toast.type === "error" ? "text-red-900 dark:text-red-100" : ""}
+            ${toast.type === "info" ? "text-blue-900 dark:text-blue-100" : ""}
+            ${toast.type === "warning" ? "text-yellow-900 dark:text-yellow-100" : ""}
           `}
           >
             {toast.message}
@@ -62,6 +62,7 @@ export default function ToastContainer() {
           <button
             onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
             className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
+            aria-label="Dismiss notification"
           >
             <X className="h-4 w-4" />
           </button>
