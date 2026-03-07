@@ -31,7 +31,7 @@ Instead of letting `getSession()` hang indefinitely, we wrap it with a Promise.r
 6. `/app/admin/page.tsx` - Admin dashboard auth check
 
 ### Pattern Applied to All Pages
-```typescript
+\`\`\`typescript
 // Before: Can hang indefinitely
 const { data: { session } } = await supabase.auth.getSession()
 
@@ -51,7 +51,7 @@ try {
   }
   throw err
 }
-```
+\`\`\`
 
 ## Why This Works
 - **Prevents hangs**: Promise.race() ensures we never wait longer than 3 seconds

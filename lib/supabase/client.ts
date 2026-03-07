@@ -28,6 +28,11 @@ export function createClient() {
 
   clientInstance = createBrowserClient(config.url, config.anonKey, {
     auth: {
+      // Do NOT auto-refresh tokens in the browser client. Token refresh requires
+      // a network call to _getUser() which is the direct cause of the "Failed to
+      // fetch" / auth timeout errors in production. The middleware (server-side)
+      // is responsible for refreshing the session cookie on each request instead.
+      autoRefreshToken: false,
       // Bypass navigator.locks to prevent "LockManager lock timed out" errors
       // in iframe environments. The lock synchronises token refresh across tabs
       // but can deadlock in sandboxed contexts.

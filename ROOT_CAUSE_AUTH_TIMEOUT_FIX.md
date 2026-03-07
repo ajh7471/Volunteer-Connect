@@ -43,7 +43,7 @@ Files with client-side `getUser()` calls that were blocking user interaction:
 ## Implementation
 All affected files now follow this pattern:
 
-```typescript
+\`\`\`typescript
 // ❌ BEFORE (blocking, unreliable)
 const { data: { user } } = await supabase.auth.getUser()
 const userId = user?.id
@@ -51,7 +51,7 @@ const userId = user?.id
 // ✅ AFTER (instant, reliable)
 const { data: { session } } = await supabase.auth.getSession()
 const userId = session?.user?.id
-```
+\`\`\`
 
 ## Why This Fix Is Correct
 1. **Middleware Protection**: The app's middleware (`middleware.ts`) already calls `getUser()` on the server side to verify authentication before allowing the user to reach these pages.

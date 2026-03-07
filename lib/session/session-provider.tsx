@@ -64,22 +64,19 @@ export function SessionProvider({ children, config, onSessionTimeout, onSessionE
       setState(newState)
     })
 
-    // Track whether initializeSession already started a session to prevent
-    // onAuthStateChange from creating a duplicate.
-    let sessionStartedByInit = false
-
     // Check for existing Supabase session and restore our app session.
-    // Uses getSession() instead of getUser() to avoid network requests
-    // that fail with "Load failed" in WebKit iframe sandboxes (v0 preview).
+    // Uses getSession() only — never getUser() or onAuthStateChange —
+    // because both of those trigger _getUser() network calls internally
+    // which fail with "Failed to fetch" in production when the token needs
+    // refreshing but the network is momentarily unavailable.
     const initializeSession = async () => {
-      // Always resolve loading — never leave the app stuck
       try {
         let session = null
         try {
           const result = await supabase.auth.getSession()
           session = result.data?.session ?? null
         } catch {
-          // getSession() threw (e.g. "Load failed" in WebKit sandbox) -- treat as no session
+          // getSession() threw — treat as no session
         }
 
         if (session?.user) {
@@ -88,56 +85,33 @@ export function SessionProvider({ children, config, onSessionTimeout, onSessionE
             if (!restored) {
               const currentState = manager.getState()
               if (!currentState.isAuthenticated) {
-                sessionStartedByInit = true
                 await manager.startSession(session.user.id)
               }
-            } else {
-              sessionStartedByInit = true
             }
           } catch {
-            // Session restore failed -- continue, user will be treated as unauthenticated
+            // Session restore failed — user treated as unauthenticated
           }
         }
       } catch {
-        // Outer catch -- silently degrade
+        // Outer catch — silently degrade
       } finally {
-        // This MUST run regardless of any error above
         setIsLoading(false)
       }
     }
 
-    // Safety net: if initializeSession hangs for any reason, unblock after 3s
+    // Safety net: unblock loading after 3s regardless
     const loadingFallback = setTimeout(() => setIsLoading(false), 3000)
     initializeSession().finally(() => clearTimeout(loadingFallback))
 
-    // Listen for Supabase auth changes.
-    // SIGNED_IN fires on every page load (not just actual logins), so we
-    // must skip it if initializeSession already handled the session.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        if (event === "SIGNED_IN" && session?.user) {
-          // Only create a session if init hasn't already done so
-          const currentState = manager.getState()
-          if (!sessionStartedByInit && !currentState.isAuthenticated) {
-            await manager.startSession(session.user.id)
-          }
-        } else if (event === "SIGNED_OUT") {
-          sessionStartedByInit = false
-          // End our session manager tracking
-          await manager.endSession("supabase_signout")
-          // Clear storage to force re-login
-          manager.clearAllSessionStorage()
-        }
-      } catch {
-        // Silently ignore network errors during auth state changes
-      }
-    })
+    // NOTE: We intentionally do NOT use supabase.auth.onAuthStateChange here.
+    // In @supabase/auth-js v2.x, onAuthStateChange internally calls _getUser()
+    // on every SIGNED_IN event to revalidate the token over the network.
+    // This is the direct cause of the "Failed to fetch" / auth timeout errors
+    // seen in production. Session state is fully managed by this provider via
+    // getSession() (local storage read, no network) and the session manager.
 
     return () => {
       unsubscribe()
-      subscription.unsubscribe()
     }
   }, [config, onSessionEnd, onSessionTimeout])
 
