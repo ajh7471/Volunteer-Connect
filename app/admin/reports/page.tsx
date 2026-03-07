@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
+import { useSessionRole } from "@/lib/useSession"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar, Users, TrendingUp, Download, FileText, BarChart, Clock, ArrowRight } from 'lucide-react'
-import { supabase } from "@/lib/supabaseClient"
 import {
   getDashboardStats,
   getShiftStatistics,
@@ -38,35 +38,20 @@ type RecentActivity = {
 
 export default function ReportsPage() {
   const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const { role, loading: roleLoading } = useSessionRole()
+  const isAdmin = roleLoading ? null : role === "admin"
   const [dashboardStats, setDashboardStats] = useState<any>(null)
   const [shiftStats, setShiftStats] = useState<ShiftStatistics | null>(null)
   const [popularSlots, setPopularSlots] = useState<PopularSlot[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Check admin role
   useEffect(() => {
-    ;(async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const uid = session?.user?.id
-      if (!uid) {
-        setIsAdmin(false)
-        return
-      }
-
-      const { data } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()
-
-      if (data?.role === "admin") {
-        setIsAdmin(true)
-        loadData()
-      } else {
-        setIsAdmin(false)
-      }
-    })()
-  }, [])
+    if (isAdmin === true) {
+      loadData()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
   async function loadData() {
     try {

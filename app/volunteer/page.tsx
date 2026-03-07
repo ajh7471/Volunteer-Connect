@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +10,7 @@ import { Calendar, Clock, Loader2, ArrowRight, Award } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
 import { ymd, parseDate, formatTime12Hour } from "@/lib/date"
 import useSWR from "swr"
+import { useSession } from "@/lib/session/session-provider"
 
 type UpcomingShift = {
   id: string
@@ -50,13 +51,8 @@ async function fetchDashboardData(userId: string) {
 }
 
 function DashboardContent() {
-  const [userId, setUserId] = useState<string | null>(null)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user?.id || null)
-    })
-  }, [])
+  const { state: sessionState, isLoading: sessionLoading } = useSession()
+  const userId = sessionState.userId
 
   const { data: assignments = [], isLoading } = useSWR(
     userId ? `dashboard-${userId}` : null,
@@ -64,7 +60,7 @@ function DashboardContent() {
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
-      dedupingInterval: 30000, // 30 second cache
+      dedupingInterval: 30000,
     },
   )
 
@@ -120,7 +116,7 @@ function DashboardContent() {
     }
   }, [assignments])
 
-  if (isLoading || !userId) {
+  if (sessionLoading || isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

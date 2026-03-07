@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react"
 import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
+import { useSessionRole } from "@/lib/useSession"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Download, User, Clock, TrendingUp } from 'lucide-react'
+import { Calendar, Download, Clock, TrendingUp } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
 import {
   getVolunteerAttendance,
@@ -21,7 +22,10 @@ import Link from "next/link"
 
 export default function AttendanceReportPage() {
   const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  // Use session hook for efficient role checking — no extra network call
+  const { role, loading: roleLoading } = useSessionRole()
+  const isAdmin = roleLoading ? null : role === "admin"
+
   const [volunteers, setVolunteers] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [selectedVolunteer, setSelectedVolunteer] = useState<string>("")
   const [startDate, setStartDate] = useState<string>("")
@@ -39,27 +43,12 @@ export default function AttendanceReportPage() {
     setEndDate(today.toISOString().split("T")[0])
   }, [])
 
-  // Check admin role
+  // Load volunteers when admin role is confirmed
   useEffect(() => {
-    ;(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setIsAdmin(false)
-        return
-      }
-
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
-
-      if (data?.role === "admin") {
-        setIsAdmin(true)
-        loadVolunteers()
-      } else {
-        setIsAdmin(false)
-      }
-    })()
-  }, [])
+    if (isAdmin === true) {
+      loadVolunteers()
+    }
+  }, [isAdmin])
 
   async function loadVolunteers() {
     const { data } = await supabase.from("profiles").select("id, name, email").order("name")
