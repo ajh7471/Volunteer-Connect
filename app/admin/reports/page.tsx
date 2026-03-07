@@ -49,9 +49,9 @@ export default function ReportsPage() {
   useEffect(() => {
     ;(async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      const uid = user?.id
+        data: { session },
+      } = await supabase.auth.getSession()
+      const uid = session?.user?.id
       if (!uid) {
         setIsAdmin(false)
         return

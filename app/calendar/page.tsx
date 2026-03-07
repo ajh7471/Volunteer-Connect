@@ -40,11 +40,9 @@ export default function CalendarPage() {
   const [loadingAttendees, setLoadingAttendees] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const loadUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUserId(user?.id || null)
-    }
-    loadUser()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id || null)
+    })
   }, [])
 
   const loadMonthData = useCallback(async () => {

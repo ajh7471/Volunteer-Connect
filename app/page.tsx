@@ -26,10 +26,6 @@ export default function HomePage() {
   useEffect(() => {
     let mounted = true
 
-    // Use getSession() as the primary check. Unlike getUser(), getSession()
-    // reads from local storage and does NOT make a network request, so it
-    // cannot throw "Load failed" in WebKit iframe sandboxes. If a session
-    // exists we redirect immediately; if not we show the login form.
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -43,7 +39,6 @@ export default function HomePage() {
         }
 
         // Session exists -- fetch role to determine redirect destination.
-        // Wrap in try/catch because this DB fetch CAN throw "Load failed".
         sessionCheckCompleted.current = true
         try {
           const { data: profile } = await supabase
@@ -55,11 +50,9 @@ export default function HomePage() {
           if (!mounted) return
           router.replace(profile?.role === "admin" ? "/admin" : "/volunteer")
         } catch {
-          // Profile fetch failed -- still redirect, default to volunteer
           if (mounted) router.replace("/volunteer")
         }
       } catch {
-        // getSession() itself failed (should be extremely rare)
         if (mounted) {
           sessionCheckCompleted.current = true
           setCheckingSession(false)

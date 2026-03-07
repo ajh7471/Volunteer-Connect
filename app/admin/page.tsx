@@ -29,18 +29,38 @@ export default function AdminDashboard() {
 
     const checkAdmin = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 3000)
+        )
+        let result: { data: { session: { user: { id: string; email?: string } } | null }; error: Error | null }
+        try {
+          result = await Promise.race([sessionPromise, timeoutPromise])
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : ""
+          if (msg.includes("Failed to fetch") || msg.includes("timeout") || msg.includes("Load failed")) {
+            if (mounted) {
+              adminCheckCompleted.current = true
+              setIsAdmin(false)
+              clearTimeout(loadTimeout)
+            }
+            return
+          }
+          throw err
+        }
+
+        const { data: { session }, error: sessionError } = result
 
         if (!mounted) return
 
-        if (userError || !user) {
+        if (sessionError || !session?.user) {
           adminCheckCompleted.current = true
           setIsAdmin(false)
           clearTimeout(loadTimeout)
           return
         }
 
-        const uid = user.id
+        const uid = session.user.id
 
         const { data, error: profileError } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()
 

@@ -54,21 +54,21 @@ export default function ProfilePage() {
   }, [])
 
   async function loadProfile() {
-    const { data: userData } = await supabase.auth.getUser()
-    if (!userData.user) {
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session?.user) {
       router.push("/auth/login")
       return
     }
 
-    setEmail(userData.user.email || "")
+    setEmail(sessionData.session.user.email || "")
 
-    const { data, error } = await supabase.from("profiles").select("*").eq("id", userData.user.id).single()
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", sessionData.session.user.id).single()
 
-    if (error || !data) {
-      toast.error("Failed to load profile")
-      setLoading(false)
-      return
-    }
+      if (error || !data) {
+        toast.error("Failed to load profile")
+        setLoading(false)
+        return
+      }
 
     const profileData = data as Profile
     setProfile(profileData)
