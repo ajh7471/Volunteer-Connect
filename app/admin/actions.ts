@@ -98,7 +98,7 @@ export async function createUserAccount(userData: {
     .from("auth_blocklist")
     .select("email")
     .eq("email", userData.email.toLowerCase())
-    .single()
+    .maybeSingle()
 
   if (blocked) {
     return { success: false, error: "This email address is blocked" }
