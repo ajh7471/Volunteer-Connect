@@ -86,7 +86,7 @@ export default function MySchedulePage() {
           )
         `,
         )
-        .eq("user_id", uid),
+        .eq("user_id", userId),
       supabase
         .from("shift_waitlist")
         .select(
@@ -104,7 +104,7 @@ export default function MySchedulePage() {
           )
         `,
         )
-        .eq("user_id", uid)
+        .eq("user_id", userId)
         .in("status", ["waiting", "notified"])
     ])
 
