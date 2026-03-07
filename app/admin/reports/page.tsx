@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
 import { useSessionRole } from "@/lib/useSession"
@@ -18,6 +18,32 @@ import {
   type ShiftStatistics,
 } from "../reporting-actions"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
+
+type Period = "this_week" | "next_week" | "2_weeks" | "this_month" | "next_month" | "last_30"
+
+const PERIOD_LABELS: { value: Period; label: string }[] = [
+  { value: "this_week",  label: "This Week" },
+  { value: "next_week",  label: "Next Week" },
+  { value: "2_weeks",    label: "2 Weeks" },
+  { value: "this_month", label: "This Month" },
+  { value: "next_month", label: "Next Month" },
+  { value: "last_30",    label: "Last 30d" },
+]
+
+function getPeriodDates(period: Period): { start: string; end: string } {
+  const today = new Date(); today.setHours(0,0,0,0)
+  const fmt = (d: Date) => d.toISOString().split("T")[0]
+  const sow = (d: Date) => { const c = new Date(d); c.setDate(c.getDate() - c.getDay()); return c }
+  switch (period) {
+    case "this_week":  { const s = sow(today); const e = new Date(s); e.setDate(s.getDate()+6); return { start: fmt(s), end: fmt(e) } }
+    case "next_week":  { const s = sow(today); s.setDate(s.getDate()+7); const e = new Date(s); e.setDate(s.getDate()+6); return { start: fmt(s), end: fmt(e) } }
+    case "2_weeks":    { const e = new Date(today); e.setDate(today.getDate()+13); return { start: fmt(today), end: fmt(e) } }
+    case "this_month": { const s = new Date(today.getFullYear(),today.getMonth(),1); const e = new Date(today.getFullYear(),today.getMonth()+1,0); return { start: fmt(s), end: fmt(e) } }
+    case "next_month": { const s = new Date(today.getFullYear(),today.getMonth()+1,1); const e = new Date(today.getFullYear(),today.getMonth()+2,0); return { start: fmt(s), end: fmt(e) } }
+    default:           { const s = new Date(today); s.setDate(today.getDate()-30); return { start: fmt(s), end: fmt(today) } }
+  }
+}
 
 type PopularSlot = {
   slot: string
@@ -44,6 +70,21 @@ export default function ReportsPage() {
   const [popularSlots, setPopularSlots] = useState<PopularSlot[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [fillPeriod, setFillPeriod] = useState<Period>("2_weeks")
+  const [fillLoading, setFillLoading] = useState(false)
+
+  const loadFillStats = useCallback(async (period: Period) => {
+    setFillLoading(true)
+    const { start, end } = getPeriodDates(period)
+    const res = await getShiftStatistics(start, end)
+    if (res.success) setShiftStats(res.data || null)
+    setFillLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadFillStats(fillPeriod)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fillPeriod])
 
   useEffect(() => {
     if (isAdmin === true) {
@@ -66,19 +107,14 @@ export default function ReportsPage() {
       // Load all data in parallel with error handling
       const results = await Promise.allSettled([
         getDashboardStats(),
-        getShiftStatistics(startDate, endDate),
         getPopularTimeSlots(),
         getRecentActivity(10),
       ])
 
-      const [statsRes, shiftStatsRes, slotsRes, activityRes] = results
+      const [statsRes, slotsRes, activityRes] = results
 
       if (statsRes.status === "fulfilled" && statsRes.value.success) {
         setDashboardStats(statsRes.value.data)
-      }
-
-      if (shiftStatsRes.status === "fulfilled" && shiftStatsRes.value.success) {
-        setShiftStats(shiftStatsRes.value.data || null)
       }
 
       if (slotsRes.status === "fulfilled" && slotsRes.value.success) {
@@ -208,12 +244,32 @@ export default function ReportsPage() {
         {/* Shift fill + popular slots side by side */}
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Shift Fill Rates — Last 30 Days</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Shift Fill Rates</CardTitle>
             </CardHeader>
-            <CardContent>
-              {shiftStats ? (
-                <div className="space-y-3">
+            <CardContent className="space-y-3">
+              {/* Period chips */}
+              <div className="flex flex-wrap gap-1">
+                {PERIOD_LABELS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setFillPeriod(value)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full border text-xs font-medium transition-all",
+                      fillPeriod === value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:border-primary/50"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {fillLoading ? (
+                <p className="text-xs text-muted-foreground py-2">Loading…</p>
+              ) : shiftStats ? (
+                <div className="space-y-2">
                   <div className="flex items-baseline justify-between">
                     <span className="text-xs text-muted-foreground">Avg. fill rate</span>
                     <span className="text-2xl font-bold">{shiftStats.avg_fill_rate}%</span>
