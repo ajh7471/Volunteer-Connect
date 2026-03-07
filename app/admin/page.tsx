@@ -46,7 +46,7 @@ export default function AdminDashboard() {
         <Card className="mx-auto mt-8 max-w-md">
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
-            <CardDescription>{error || "You need admin privileges to access this page."}</CardDescription>
+            <CardDescription>You need admin privileges to access this page.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             <Button className="min-h-[44px]" onClick={() => router.push("/calendar")}>Go to Calendar</Button>
