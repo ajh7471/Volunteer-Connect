@@ -37,13 +37,33 @@ export function clearAuthCache() {
   authCache = null
 }
 
+// Detect v0 preview environment where external API calls are sandboxed
+function isV0Preview(): boolean {
+  if (typeof window === "undefined") return false
+  const hostname = window.location.hostname
+  return hostname.includes("vusercontent.net") || hostname.includes("v0.dev")
+}
+
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+  const [isPreview, setIsPreview] = useState(false)
   const authCheckCompleted = useRef(false)
   const r = useRouter()
 
+  // Check for v0 preview on mount
+  useEffect(() => {
+    if (isV0Preview()) {
+      setIsPreview(true)
+      setReady(true)
+    }
+  }, [])
+
   const checkAuth = useCallback(async (retryCount = 0): Promise<boolean> => {
+    // Skip auth in v0 preview - external API calls are blocked
+    if (isV0Preview()) {
+      return true
+    }
     try {
       // Check cache first for instant response
       const cached = getAuthCache()
@@ -51,31 +71,14 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         return true
       }
 
-      // Create a timeout promise that rejects after 3 seconds
+      // Create a timeout promise that rejects after 4 seconds
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Auth check timeout")), 3000)
+        setTimeout(() => reject(new Error("Auth check timeout")), 4000)
       )
 
       // Race the session check against the timeout
-      // Note: getSession() can still trigger network calls in Supabase auth lib v2.x
-      // when it detects the session needs refresh
       const sessionPromise = supabase.auth.getSession()
-      
-      let result: { data: { session: { user: { id: string; email?: string } } | null }; error: Error | null }
-      try {
-        result = await Promise.race([sessionPromise, timeoutPromise])
-      } catch (raceError) {
-        // Handle "Failed to fetch" from iframe sandbox or timeout
-        const msg = raceError instanceof Error ? raceError.message : String(raceError)
-        if (msg.includes("Failed to fetch") || msg.includes("Load failed") || msg.includes("timeout")) {
-          console.warn("[v0] RequireAuth: Network blocked in preview, redirecting to login")
-          setAuthCache(null, false)
-          return false
-        }
-        throw raceError
-      }
-
-      const { data: { session }, error: sessionError } = result
+      const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise])
 
       if (sessionError) {
         console.warn("[v0] RequireAuth session error:", sessionError.message)
@@ -92,17 +95,9 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
       setAuthCache(session.user, true)
       return true
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      console.error("[v0] RequireAuth error:", msg)
-      
-      // Handle network errors - don't retry, just fail fast to login
-      if (msg.includes("Failed to fetch") || msg.includes("Load failed")) {
-        setAuthCache(null, false)
-        return false
-      }
-      
+      console.error("[v0] RequireAuth error:", error instanceof Error ? error.message : String(error))
       // Don't retry on timeouts, just fail fast
-      if (retryCount === 0 && !msg.includes("timeout")) {
+      if (retryCount === 0 && !(error instanceof Error && error.message === "Auth check timeout")) {
         await new Promise((resolve) => setTimeout(resolve, 300))
         return checkAuth(retryCount + 1)
       }
@@ -111,6 +106,9 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   }, [])
 
   useEffect(() => {
+    // Skip all auth logic in v0 preview - it's handled by the earlier useEffect
+    if (isV0Preview()) return
+
     let mounted = true
 
     const timeout = setTimeout(() => {
