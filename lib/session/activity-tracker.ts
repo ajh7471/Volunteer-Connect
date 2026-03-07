@@ -9,7 +9,23 @@ interface ActivityTrackerOptions {
   throttleMs?: number
 }
 
-const ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "scroll", "touchstart", "touchmove", "click", "focus"]
+const ACTIVITY_EVENTS = [
+  "mousedown",
+  "mousemove",
+  "keydown",
+  "keyup",
+  "scroll",
+  "touchstart",
+  "touchmove",
+  "click",
+  "focus",
+  "focusin",
+  "input",
+  "change",
+  "pointerdown",
+  "pointermove",
+  "wheel",
+]
 
 export function createActivityTracker(options: ActivityTrackerOptions) {
   const { idleTimeoutMs, onIdle, onActive, throttleMs = 1000 } = options
@@ -50,12 +66,21 @@ export function createActivityTracker(options: ActivityTrackerOptions) {
     resetIdleTimer()
   }
 
+  // When user switches back to the tab, treat it as activity
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      handleActivity()
+    }
+  }
+
   const start = () => {
     if (typeof window === "undefined") return
 
     ACTIVITY_EVENTS.forEach((event) => {
       window.addEventListener(event, handleActivity, { passive: true })
     })
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     resetIdleTimer()
   }
@@ -66,6 +91,8 @@ export function createActivityTracker(options: ActivityTrackerOptions) {
     ACTIVITY_EVENTS.forEach((event) => {
       window.removeEventListener(event, handleActivity)
     })
+
+    document.removeEventListener("visibilitychange", handleVisibilityChange)
 
     if (idleTimer) {
       clearTimeout(idleTimer)

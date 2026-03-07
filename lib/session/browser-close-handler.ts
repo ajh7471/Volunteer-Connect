@@ -16,6 +16,28 @@ export function createBrowserCloseHandler(options: BrowserCloseHandlerOptions) {
     isUnloading = true
     onBeforeUnload()
 
+    // Clear client-side storage before sending logout beacon
+    // This ensures the user must login again even if logout fails
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.clear()
+        // Clear all auth-related localStorage
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (
+            key &&
+            (key.includes("supabase") || key.includes("sb-") || key.includes("vh_") || key.includes("volunteer-hub"))
+          ) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach((key) => localStorage.removeItem(key))
+      }
+    } catch {
+      // Silently ignore storage errors
+    }
+
     // Use sendBeacon for reliable logout on page close.
     // Wrapped in try/catch to prevent "Load failed" errors in WebKit/Safari.
     if (sessionToken && typeof navigator !== "undefined" && navigator.sendBeacon) {
@@ -41,6 +63,26 @@ export function createBrowserCloseHandler(options: BrowserCloseHandlerOptions) {
     if (event.persisted) {
       // Page is being cached (bfcache), don't logout
       return
+    }
+
+    // Clear client-side storage on page hide
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.clear()
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (
+            key &&
+            (key.includes("supabase") || key.includes("sb-") || key.includes("vh_") || key.includes("volunteer-hub"))
+          ) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach((key) => localStorage.removeItem(key))
+      }
+    } catch {
+      // Silently ignore storage errors
     }
 
     // Only fire sendBeacon for true page unloads, not SPA navigations.

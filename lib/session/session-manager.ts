@@ -17,8 +17,8 @@ interface SessionManagerOptions {
 
 export function createSessionManager(options: SessionManagerOptions = {}) {
   const config: SessionConfig = {
-    idleTimeoutMinutes: 30,
-    absoluteTimeoutHours: 8,
+    idleTimeoutMinutes: 60,
+    absoluteTimeoutHours: 12,
     heartbeatIntervalMinutes: 5,
     warnBeforeTimeoutMinutes: 5,
     maxConcurrentSessions: 0,
@@ -41,6 +41,7 @@ export function createSessionManager(options: SessionManagerOptions = {}) {
 
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
   let timeoutWarningInterval: ReturnType<typeof setInterval> | null = null
+  let idleWarningTimeout: ReturnType<typeof setTimeout> | null = null
   let activityTracker: ReturnType<typeof createActivityTracker> | null = null
   let browserCloseHandler: ReturnType<typeof createBrowserCloseHandler> | null = null
   let broadcastCleanup: (() => void) | null = null
@@ -102,7 +103,12 @@ export function createSessionManager(options: SessionManagerOptions = {}) {
         body: JSON.stringify({ sessionToken: state.sessionToken }),
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        // Successful heartbeat -- update last activity timestamp.
+        // This prevents the idle timer from expiring while the session
+        // is still valid on the server.
+        updateState({ lastActivity: Date.now() })
+      } else {
         try {
           const data = await response.json()
           if (data.expired || data.revoked) {
@@ -138,17 +144,40 @@ export function createSessionManager(options: SessionManagerOptions = {}) {
     updateState({ isIdle: true })
     events.onIdleStart?.()
 
-    // Start timeout warning countdown
+    // Clear any existing warning timeout to prevent stacking
+    if (idleWarningTimeout) {
+      clearTimeout(idleWarningTimeout)
+      idleWarningTimeout = null
+    }
+
+    // If warnBeforeTimeoutMinutes is 0, skip the warning entirely and
+    // end the session immediately when the idle timer fires.
+    if (config.warnBeforeTimeoutMinutes <= 0) {
+      if (state.isAuthenticated) {
+        endSession("timeout")
+        events.onTimeout?.()
+      }
+      return
+    }
+
+    // Start timeout warning countdown after the grace period
     const warningTime = (config.idleTimeoutMinutes - config.warnBeforeTimeoutMinutes) * 60 * 1000
 
-    setTimeout(() => {
-      if (state.isIdle) {
+    idleWarningTimeout = setTimeout(() => {
+      // Re-check idle state -- user may have become active while waiting
+      if (state.isIdle && state.isAuthenticated) {
         startTimeoutWarning()
       }
     }, warningTime)
   }
 
   const handleIdleEnd = () => {
+    // Clear the warning timeout so it doesn't fire after user returns
+    if (idleWarningTimeout) {
+      clearTimeout(idleWarningTimeout)
+      idleWarningTimeout = null
+    }
+
     updateState({ isIdle: false, showTimeoutWarning: false })
     stopTimeoutWarning()
     events.onIdleEnd?.()
@@ -278,6 +307,10 @@ export function createSessionManager(options: SessionManagerOptions = {}) {
     browserCloseHandler?.stop()
     stopHeartbeat()
     stopTimeoutWarning()
+    if (idleWarningTimeout) {
+      clearTimeout(idleWarningTimeout)
+      idleWarningTimeout = null
+    }
     broadcastCleanup?.()
 
     // Clear storage and state BEFORE the server call so the UI updates immediately

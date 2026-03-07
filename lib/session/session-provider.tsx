@@ -72,35 +72,43 @@ export function SessionProvider({ children, config, onSessionTimeout, onSessionE
     // Uses getSession() instead of getUser() to avoid network requests
     // that fail with "Load failed" in WebKit iframe sandboxes (v0 preview).
     const initializeSession = async () => {
+      // Always resolve loading — never leave the app stuck
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
+        let session = null
+        try {
+          const result = await supabase.auth.getSession()
+          session = result.data?.session ?? null
+        } catch {
+          // getSession() threw (e.g. "Load failed" in WebKit sandbox) -- treat as no session
+        }
 
         if (session?.user) {
-          const restored = await manager.restoreSession()
-          if (!restored) {
-            // Only start a new server session if we don't already have one
-            // (restoreSession failed because sessionStorage was empty or
-            // the heartbeat failed). Guard with a flag so onAuthStateChange
-            // doesn't create a second row.
-            const currentState = manager.getState()
-            if (!currentState.isAuthenticated) {
+          try {
+            const restored = await manager.restoreSession()
+            if (!restored) {
+              const currentState = manager.getState()
+              if (!currentState.isAuthenticated) {
+                sessionStartedByInit = true
+                await manager.startSession(session.user.id)
+              }
+            } else {
               sessionStartedByInit = true
-              await manager.startSession(session.user.id)
             }
-          } else {
-            sessionStartedByInit = true
+          } catch {
+            // Session restore failed -- continue, user will be treated as unauthenticated
           }
         }
       } catch {
-        // Silently ignore -- session features degrade gracefully
+        // Outer catch -- silently degrade
       } finally {
+        // This MUST run regardless of any error above
         setIsLoading(false)
       }
     }
 
-    initializeSession()
+    // Safety net: if initializeSession hangs for any reason, unblock after 3s
+    const loadingFallback = setTimeout(() => setIsLoading(false), 3000)
+    initializeSession().finally(() => clearTimeout(loadingFallback))
 
     // Listen for Supabase auth changes.
     // SIGNED_IN fires on every page load (not just actual logins), so we
@@ -117,7 +125,10 @@ export function SessionProvider({ children, config, onSessionTimeout, onSessionE
           }
         } else if (event === "SIGNED_OUT") {
           sessionStartedByInit = false
+          // End our session manager tracking
           await manager.endSession("supabase_signout")
+          // Clear storage to force re-login
+          manager.clearAllSessionStorage()
         }
       } catch {
         // Silently ignore network errors during auth state changes

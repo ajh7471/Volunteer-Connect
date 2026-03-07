@@ -40,22 +40,34 @@ export default function Header() {
     setSigningOut(true)
 
     try {
+      // 1. End our session manager tracking
       await sessionLogout("manual_logout")
 
+      // 2. Sign out from Supabase with global scope (all sessions/devices)
       const { error } = await supabase.auth.signOut({ scope: "global" })
 
       if (error) {
         console.error("Supabase sign out error:", error)
       }
 
+      // 3. Clear all storage to force re-login on next visit
       if (typeof window !== "undefined") {
         try {
+          // Clear sessionStorage completely
           sessionStorage.clear()
-          localStorage.removeItem("volunteer-hub-cache")
+
+          // Clear all auth-related localStorage
           const keysToRemove: string[] = []
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i)
-            if (key && (key.includes("supabase") || key.includes("sb-") || key.includes("vh_"))) {
+            if (
+              key &&
+              (key.includes("supabase") ||
+                key.includes("sb-") ||
+                key.includes("vh_") ||
+                key.includes("volunteer-hub") ||
+                key.includes("auth"))
+            ) {
               keysToRemove.push(key)
             }
           }
@@ -65,6 +77,7 @@ export default function Header() {
         }
       }
 
+      // 4. Redirect to login page (hard redirect to ensure fresh page load)
       window.location.href = "/"
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unable to sign out. Please try again."
