@@ -354,7 +354,7 @@ export default function HomePage() {
 
           {/* Footer links */}
           <div className="mt-8 flex items-center justify-between text-sm text-muted-foreground/80">
-            <span className="font-medium">v 1.6.1</span>
+            <span className="font-medium">v 1.6.2</span>
             <Link href="/about" className="font-medium underline underline-offset-4 decoration-muted-foreground/40 hover:text-foreground hover:decoration-foreground transition-colors">
               About
             </Link>
