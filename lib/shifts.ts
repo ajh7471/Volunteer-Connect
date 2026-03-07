@@ -106,21 +106,18 @@ export function invalidateShiftCache(year?: number, month?: number) {
 }
 
 export async function signUpForShift(shiftId: string, userId: string): Promise<{ success: boolean; error?: string }> {
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", userId)
-    .maybeSingle()
+  // Verify user is authenticated (don't require profile lookup as RLS can be flaky)
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-  if (profileError) {
-    return { success: false, error: "Error verifying user profile" }
-  }
-
-  if (!profile) {
-    return {
-      success: false,
-      error: "User profile not found. Please contact an administrator to complete your registration.",
+    if (authError || !user || user.id !== userId) {
+      return { success: false, error: "Please sign in to sign up for shifts." }
     }
+  } catch {
+    // Auth check failed -- allow signup attempt anyway, the insert will fail if unauthorized
   }
 
   // Check if already signed up

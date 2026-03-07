@@ -71,8 +71,8 @@ export interface SessionManagerEvents {
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
-  idleTimeoutMinutes: 30,
-  absoluteTimeoutHours: 8,
+  idleTimeoutMinutes: 60,
+  absoluteTimeoutHours: 12,
   heartbeatIntervalMinutes: 5,
   warnBeforeTimeoutMinutes: 5,
   maxConcurrentSessions: 0,

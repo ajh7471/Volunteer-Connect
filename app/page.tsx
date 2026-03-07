@@ -77,8 +77,23 @@ export default function HomePage() {
     setLoading(true)
     setError(null)
 
+    // Retry helper for "Load failed" errors in WebKit iframe sandboxes
+    const attemptSignIn = async (retries = 2): Promise<{ data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"]; error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"] }> => {
+      try {
+        return await supabase.auth.signInWithPassword({ email, password })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : ""
+        if (msg.includes("Load failed") && retries > 0) {
+          // Wait briefly then retry
+          await new Promise((r) => setTimeout(r, 500))
+          return attemptSignIn(retries - 1)
+        }
+        throw err
+      }
+    }
+
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error: authError } = await attemptSignIn()
 
       if (authError) {
         if (authError.message.includes("Invalid login credentials") || authError.message.includes("invalid")) {
@@ -93,9 +108,15 @@ export default function HomePage() {
       }
 
       if (data.user) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
-
-        const destination = profile?.role === "admin" ? "/admin" : "/volunteer"
+        let destination = "/volunteer"
+        try {
+          const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
+          if (profile?.role === "admin") {
+            destination = "/admin"
+          }
+        } catch {
+          // Profile fetch failed -- still redirect to default
+        }
         window.location.href = destination
       }
     } catch (err) {
@@ -340,7 +361,7 @@ export default function HomePage() {
 
           {/* Footer links */}
           <div className="mt-8 flex items-center justify-between text-sm text-muted-foreground/80">
-            <span className="font-medium">v1.6</span>
+            <span className="font-medium">v1.6.1</span>
             <Link href="/about" className="font-medium underline underline-offset-4 decoration-muted-foreground/40 hover:text-foreground hover:decoration-foreground transition-colors">
               About
             </Link>
