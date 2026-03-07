@@ -40,29 +40,9 @@ export default function CalendarPage() {
   const [loadingAttendees, setLoadingAttendees] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const sessionPromise = supabase.auth.getSession()
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 3000)
-        )
-        try {
-          const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise])
-          setUserId(session?.user?.id || null)
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : ""
-          if (msg.includes("Failed to fetch") || msg.includes("timeout") || msg.includes("Load failed")) {
-            setUserId(null)
-            return
-          }
-          throw err
-        }
-      } catch (error) {
-        console.error("[v0] Failed to load user:", error)
-        setUserId(null)
-      }
-    }
-    loadUser()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id || null)
+    })
   }, [])
 
   const loadMonthData = useCallback(async () => {

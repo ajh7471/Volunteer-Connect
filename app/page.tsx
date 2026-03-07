@@ -26,36 +26,9 @@ export default function HomePage() {
   useEffect(() => {
     let mounted = true
 
-    // Use getSession() as the primary check. Unlike getUser(), getSession()
-    // reads from local storage and does NOT make a network request, so it
-    // cannot throw "Load failed" in WebKit iframe sandboxes. If a session
-    // exists we redirect immediately; if not we show the login form.
     const checkSession = async () => {
       try {
-        // Add a timeout wrapper to prevent hanging on slow/blocked network
-        const sessionPromise = supabase.auth.getSession()
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Session check timeout")), 3000)
-        )
-
-        let result: { data: { session: { user: { id: string; email?: string } } | null } }
-        try {
-          result = await Promise.race([sessionPromise, timeoutPromise])
-        } catch (err) {
-          // Handle network errors and timeouts gracefully
-          const msg = err instanceof Error ? err.message : ""
-          if (msg.includes("Failed to fetch") || msg.includes("timeout") || msg.includes("Load failed")) {
-            // Network unavailable or timeout - just show login form
-            if (mounted) {
-              sessionCheckCompleted.current = true
-              setCheckingSession(false)
-            }
-            return
-          }
-          throw err
-        }
-
-        const { data: { session } } = result
+        const { data: { session } } = await supabase.auth.getSession()
 
         if (!mounted) return
 
@@ -66,7 +39,6 @@ export default function HomePage() {
         }
 
         // Session exists -- fetch role to determine redirect destination.
-        // Wrap in try/catch because this DB fetch CAN throw "Load failed".
         sessionCheckCompleted.current = true
         try {
           const { data: profile } = await supabase
@@ -78,11 +50,9 @@ export default function HomePage() {
           if (!mounted) return
           router.replace(profile?.role === "admin" ? "/admin" : "/volunteer")
         } catch {
-          // Profile fetch failed -- still redirect, default to volunteer
           if (mounted) router.replace("/volunteer")
         }
       } catch {
-        // getSession() itself failed (should be extremely rare)
         if (mounted) {
           sessionCheckCompleted.current = true
           setCheckingSession(false)

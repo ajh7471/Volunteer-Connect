@@ -54,32 +54,15 @@ export default function ProfilePage() {
   }, [])
 
   async function loadProfile() {
-    try {
-      const sessionPromise = supabase.auth.getSession()
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 3000)
-      )
-      let result: { data: { session: { user: { id: string; email?: string } } | null } }
-      try {
-        result = await Promise.race([sessionPromise, timeoutPromise])
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : ""
-        if (msg.includes("Failed to fetch") || msg.includes("timeout") || msg.includes("Load failed")) {
-          router.push("/auth/login")
-          return
-        }
-        throw err
-      }
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session?.user) {
+      router.push("/auth/login")
+      return
+    }
 
-      const { data: sessionData } = result
-      if (!sessionData.session?.user) {
-        router.push("/auth/login")
-        return
-      }
+    setEmail(sessionData.session.user.email || "")
 
-      setEmail(sessionData.session.user.email || "")
-
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", sessionData.session.user.id).single()
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", sessionData.session.user.id).single()
 
       if (error || !data) {
         toast.error("Failed to load profile")
