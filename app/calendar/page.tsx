@@ -24,28 +24,29 @@ import { toast } from "@/lib/toast"
 import { joinWaitlist } from "@/app/admin/shift-management-actions"
 import Link from "next/link"
 import type { AssignmentWithRelations } from "@/types/database"
+import { useSession } from "@/lib/session/session-provider"
 
 export default function CalendarPage() {
   const router = useRouter()
+  // Read userId from the already-resolved session provider — no extra
+  // getSession() network call, no race condition on page load.
+  const { state: sessionState, isLoading: sessionLoading } = useSession()
+  const userId = sessionState.userId
+
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [shifts, setShifts] = useState<ShiftWithCapacity[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedShift, setSelectedShift] = useState<ShiftWithCapacity | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
   const [userAssignments, setUserAssignments] = useState<Set<string>>(new Set())
   const [signingUpShifts, setSigningUpShifts] = useState<Set<string>>(new Set())
   const [shiftAttendees, setShiftAttendees] = useState<Record<string, Array<{ name: string | null; id: string }>>>({})
   const [loadingAttendees, setLoadingAttendees] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user?.id || null)
-    })
-  }, [])
-
   const loadMonthData = useCallback(async () => {
+    // Don't run until the session provider has resolved
+    if (sessionLoading) return
     if (!userId) {
       setLoading(false)
       return
@@ -71,13 +72,14 @@ export default function CalendarPage() {
     }
 
     setLoading(false)
-  }, [currentMonth, userId])
+  }, [currentMonth, userId, sessionLoading])
 
   useEffect(() => {
-    if (userId) {
+    // Only trigger once the session provider is resolved
+    if (!sessionLoading) {
       loadMonthData()
     }
-  }, [loadMonthData, userId])
+  }, [loadMonthData, sessionLoading])
 
   const monthName = useMemo(
     () => currentMonth.toLocaleString("default", { month: "long", year: "numeric" }),
@@ -347,7 +349,7 @@ export default function CalendarPage() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            {loading ? (
+            {sessionLoading || loading ? (
               <Card>
                 <CardContent className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
