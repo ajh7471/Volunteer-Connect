@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Calendar, FileText, Settings, UserCog, Mail } from "lucide-react"
+import { Users, Calendar, FileText, UserCog, Mail } from "lucide-react"
 import { useSessionRole } from "@/lib/useSession"
 
 export default function AdminDashboard() {
@@ -123,85 +123,60 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Admin Actions */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
-            <CardHeader>
-              <UserCog className="mb-3 h-9 w-9 text-primary/80" />
-              <CardTitle className="text-lg">User Management</CardTitle>
-              <CardDescription className="text-sm">Create users, manage roles, and block emails</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full min-h-[44px] font-medium">
-                <Link href="/admin/users">Manage Users</Link>
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Primary actions */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Link href="/admin/shifts" className="group block">
+            <Card className="border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5 h-full">
+              <CardContent className="flex items-center gap-5 p-6">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 group-hover:bg-primary/15 transition-colors">
+                  <Calendar className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Shift Management</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Week view, bulk create/delete, assign volunteers
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
-            <CardHeader>
-              <Users className="mb-3 h-9 w-9 text-primary/80" />
-              <CardTitle className="text-lg">Manage Volunteers</CardTitle>
-              <CardDescription className="text-sm">View, edit, and manage volunteer accounts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full min-h-[44px] font-medium">
-                <Link href="/admin/volunteers">View Volunteers</Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <Link href="/admin/volunteers" className="group block">
+            <Card className="border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5 h-full">
+              <CardContent className="flex items-center gap-5 p-6">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 group-hover:bg-primary/15 transition-colors">
+                  <Users className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Volunteers</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    View rosters, manage schedules by volunteer
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
 
-          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
-            <CardHeader>
-              <Calendar className="mb-3 h-9 w-9 text-primary/80" />
-              <CardTitle className="text-lg">Manage Shifts</CardTitle>
-              <CardDescription className="text-sm">Create shifts and assign volunteers to slots</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full min-h-[44px] font-medium">
-                <Link href="/admin/shifts">Manage Shifts</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
-            <CardHeader>
-              <Mail className="mb-3 h-9 w-9 text-primary/80" />
-              <CardTitle className="text-lg">Email Communications</CardTitle>
-              <CardDescription className="text-sm">Send emails to opted-in volunteers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" className="w-full min-h-[44px] font-medium">
-                <Link href="/admin/emails">Manage Emails</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
-            <CardHeader>
-              <FileText className="mb-3 h-9 w-9 text-primary/80" />
-              <CardTitle className="text-lg">View Reports</CardTitle>
-              <CardDescription className="text-sm">Analytics and volunteer activity reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" className="w-full min-h-[44px] font-medium">
-                <Link href="/admin/reports">View Reports</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/10 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
-            <CardHeader>
-              <Settings className="mb-3 h-9 w-9 text-primary/80" />
-              <CardTitle className="text-lg">Settings</CardTitle>
-              <CardDescription className="text-sm">Configure system settings and preferences</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" className="w-full min-h-[44px] font-medium">
-                <Link href="/admin/settings">Settings</Link>
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Secondary actions */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            { href: "/admin/users", icon: UserCog, label: "User Management", desc: "Roles, accounts, blocklist" },
+            { href: "/admin/emails", icon: Mail, label: "Emails", desc: "Send to opted-in volunteers" },
+            { href: "/admin/reports", icon: FileText, label: "Reports", desc: "Analytics and activity" },
+          ].map(({ href, icon: Icon, label, desc }) => (
+            <Link key={href} href={href} className="group block">
+              <Card className="border-border hover:border-primary/30 transition-all h-full">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{label}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
       </div>
     </RequireAuth>

@@ -402,6 +402,258 @@ export async function getAdminUsers() {
 }
 
 /**
+ * BULK CREATE SHIFTS
+ *
+ * Creates shifts for every matching day in a date range.
+ * Skips dates that already have a shift for that slot.
+ *
+ * @param options slot, startTime, endTime, capacity, startDate, endDate, daysOfWeek (0=Sun..6=Sat)
+ * @returns created and skipped counts
+ */
+export async function bulkCreateShifts(options: {
+  slot: string
+  startTime: string
+  endTime: string
+  capacity: number
+  startDate: string
+  endDate: string
+  daysOfWeek: number[]
+}) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+
+  // Fetch existing shifts in the range to avoid duplicates
+  const { data: existing } = await supabase
+    .from("shifts")
+    .select("shift_date, slot")
+    .eq("slot", options.slot)
+    .gte("shift_date", options.startDate)
+    .lte("shift_date", options.endDate)
+
+  const existingSet = new Set((existing || []).map((s) => s.shift_date))
+
+  const toInsert: { slot: string; start_time: string; end_time: string; capacity: number; shift_date: string }[] = []
+  const current = new Date(options.startDate + "T00:00:00")
+  const end = new Date(options.endDate + "T00:00:00")
+
+  while (current <= end) {
+    const dow = current.getDay() // 0=Sun..6=Sat
+    const dateStr = current.toISOString().split("T")[0]
+    if (options.daysOfWeek.includes(dow) && !existingSet.has(dateStr)) {
+      toInsert.push({
+        slot: options.slot,
+        start_time: options.startTime,
+        end_time: options.endTime,
+        capacity: options.capacity,
+        shift_date: dateStr,
+      })
+    }
+    current.setDate(current.getDate() + 1)
+  }
+
+  if (toInsert.length === 0) {
+    return { success: true, created: 0, skipped: existingSet.size }
+  }
+
+  const { error } = await supabase.from("shifts").insert(toInsert)
+  if (error) return { success: false, error: error.message }
+
+  return { success: true, created: toInsert.length, skipped: existingSet.size }
+}
+
+/**
+ * BULK DELETE SHIFTS
+ *
+ * Deletes shifts in a date range matching the slot filter.
+ * onlyEmpty: when true, skips shifts that have assignments.
+ *
+ * @returns deleted and skipped counts
+ */
+export async function bulkDeleteShifts(options: {
+  startDate: string
+  endDate: string
+  slot?: string
+  onlyEmpty?: boolean
+}) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+
+  let query = supabase
+    .from("shifts")
+    .select("id")
+    .gte("shift_date", options.startDate)
+    .lte("shift_date", options.endDate)
+
+  if (options.slot) query = query.eq("slot", options.slot)
+
+  const { data: shifts, error: fetchError } = await query
+  if (fetchError) return { success: false, error: fetchError.message }
+  if (!shifts || shifts.length === 0) return { success: true, deleted: 0, skipped: 0 }
+
+  const shiftIds = shifts.map((s) => s.id)
+
+  let idsToDelete = shiftIds
+  let skipped = 0
+
+  if (options.onlyEmpty) {
+    const { data: assigned } = await supabase
+      .from("shift_assignments")
+      .select("shift_id")
+      .in("shift_id", shiftIds)
+
+    const assignedSet = new Set((assigned || []).map((a) => a.shift_id))
+    idsToDelete = shiftIds.filter((id) => !assignedSet.has(id))
+    skipped = shiftIds.length - idsToDelete.length
+  }
+
+  if (idsToDelete.length === 0) return { success: true, deleted: 0, skipped }
+
+  const { error } = await supabase.from("shifts").delete().in("id", idsToDelete)
+  if (error) return { success: false, error: error.message }
+
+  return { success: true, deleted: idsToDelete.length, skipped }
+}
+
+/**
+ * BULK UPDATE SHIFT CAPACITY
+ *
+ * Updates the capacity for all shifts in a date range and slot.
+ *
+ * @returns updated count
+ */
+export async function bulkUpdateCapacity(options: {
+  startDate: string
+  endDate: string
+  slot?: string
+  capacity: number
+}) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+
+  let query = supabase
+    .from("shifts")
+    .update({ capacity: options.capacity })
+    .gte("shift_date", options.startDate)
+    .lte("shift_date", options.endDate)
+
+  if (options.slot) query = query.eq("slot", options.slot)
+
+  const { error, count } = await query.select()
+  if (error) return { success: false, error: error.message }
+
+  return { success: true, updated: count ?? 0 }
+}
+
+/**
+ * GET SHIFTS FOR DATE RANGE WITH ASSIGNMENT COUNTS
+ *
+ * Efficient fetch for the admin shift grid view.
+ * Returns shifts with their fill counts and assigned volunteer names.
+ */
+export async function getShiftsForRange(startDate: string, endDate: string) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+
+  const { data: shifts, error: shiftError } = await supabase
+    .from("shifts")
+    .select(`
+      id, shift_date, slot, start_time, end_time, capacity,
+      shift_assignments(
+        id,
+        user_id,
+        profiles(id, name, email)
+      )
+    `)
+    .gte("shift_date", startDate)
+    .lte("shift_date", endDate)
+    .order("shift_date", { ascending: true })
+    .order("start_time", { ascending: true })
+
+  if (shiftError) return { success: false, error: shiftError.message }
+
+  return { success: true, shifts: shifts || [] }
+}
+
+/**
+ * CREATE A SINGLE SHIFT
+ */
+export async function createSingleShift(data: {
+  shift_date: string
+  slot: string
+  start_time: string
+  end_time: string
+  capacity: number
+}) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+  const { data: shift, error } = await supabase.from("shifts").insert(data).select().single()
+  if (error) return { success: false, error: error.message }
+
+  return { success: true, shift }
+}
+
+/**
+ * UPDATE A SINGLE SHIFT
+ */
+export async function updateSingleShift(
+  shiftId: string,
+  data: { start_time?: string; end_time?: string; capacity?: number; slot?: string }
+) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+  const { error } = await supabase.from("shifts").update(data).eq("id", shiftId)
+  if (error) return { success: false, error: error.message }
+
+  return { success: true }
+}
+
+/**
+ * DELETE A SINGLE SHIFT (and its assignments)
+ */
+export async function deleteSingleShift(shiftId: string) {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+  await supabase.from("shift_assignments").delete().eq("shift_id", shiftId)
+  const { error } = await supabase.from("shifts").delete().eq("id", shiftId)
+  if (error) return { success: false, error: error.message }
+
+  return { success: true }
+}
+
+/**
+ * GET ALL ACTIVE VOLUNTEERS (for assignment dropdowns)
+ */
+export async function getActiveVolunteers() {
+  const { isAdmin, error: authError } = await verifyAdminRole()
+  if (!isAdmin) return { success: false, error: authError || "Unauthorized" }
+
+  const supabase = await getServiceRoleClient()
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, name, email")
+    .eq("role", "volunteer")
+    .eq("active", true)
+    .order("name", { ascending: true })
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, volunteers: data || [] }
+}
+
+/**
  * GET SINGLE USER PROFILE WITH EMAIL
  *
  * Fetches a single user profile by ID with their email from auth.

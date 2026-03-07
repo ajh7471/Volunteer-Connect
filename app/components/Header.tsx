@@ -105,11 +105,15 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 md:flex">
+            {userId && role === "admin" && <NavLink href="/admin" label="Dashboard" />}
+            {userId && role === "admin" && <NavLink href="/admin/shifts" label="Shifts" />}
+            {userId && role === "admin" && <NavLink href="/admin/volunteers" label="Volunteers" />}
+            {userId && role === "admin" && <NavLink href="/admin/emails" label="Emails" />}
+            {userId && role === "admin" && <NavLink href="/admin/reports" label="Reports" />}
             {userId && role === "volunteer" && <NavLink href="/volunteer" label="Dashboard" />}
-            {userId && <NavLink href="/calendar" label="Calendar" />}
-            {userId && <NavLink href="/my-schedule" label="My Schedule" />}
+            {userId && role === "volunteer" && <NavLink href="/calendar" label="Calendar" />}
+            {userId && role === "volunteer" && <NavLink href="/my-schedule" label="My Schedule" />}
             {userId && <NavLink href="/profile" label="Profile" />}
-            {role === "admin" && <NavLink href="/admin" label="Admin" />}
           </nav>
 
           {/* Desktop Auth Buttons */}
@@ -149,13 +153,17 @@ export default function Header() {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <nav className="flex flex-col gap-1 border-t border-primary/10 py-4 md:hidden">
+            {userId && role === "admin" && <NavLink href="/admin" label="Dashboard" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && role === "admin" && <NavLink href="/admin/shifts" label="Shifts" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && role === "admin" && <NavLink href="/admin/volunteers" label="Volunteers" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && role === "admin" && <NavLink href="/admin/emails" label="Emails" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && role === "admin" && <NavLink href="/admin/reports" label="Reports" onClick={() => setMobileMenuOpen(false)} mobile />}
             {userId && role === "volunteer" && (
               <NavLink href="/volunteer" label="Dashboard" onClick={() => setMobileMenuOpen(false)} mobile />
             )}
-            {userId && <NavLink href="/calendar" label="Calendar" onClick={() => setMobileMenuOpen(false)} mobile />}
-            {userId && <NavLink href="/my-schedule" label="My Schedule" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && role === "volunteer" && <NavLink href="/calendar" label="Calendar" onClick={() => setMobileMenuOpen(false)} mobile />}
+            {userId && role === "volunteer" && <NavLink href="/my-schedule" label="My Schedule" onClick={() => setMobileMenuOpen(false)} mobile />}
             {userId && <NavLink href="/profile" label="Profile" onClick={() => setMobileMenuOpen(false)} mobile />}
-            {role === "admin" && <NavLink href="/admin" label="Admin" onClick={() => setMobileMenuOpen(false)} mobile />}
             <div className="mt-3 flex flex-col gap-2 border-t border-primary/10 pt-3">
               {userId ? (
                 <Button onClick={signOut} variant="outline" className="w-full min-h-[44px] font-medium" disabled={signingOut}>
