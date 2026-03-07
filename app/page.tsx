@@ -26,13 +26,34 @@ export default function HomePage() {
   useEffect(() => {
     let mounted = true
 
-    // Use getSession() as the primary check. Unlike getUser(), getSession()
-    // reads from local storage and does NOT make a network request, so it
-    // cannot throw "Load failed" in WebKit iframe sandboxes. If a session
-    // exists we redirect immediately; if not we show the login form.
+    // Use getSession() as the primary check. Note: Supabase auth lib v2.x
+    // can still make network calls when it detects session needs refresh.
+    // In v0 preview iframe sandbox, these calls can fail with "Failed to fetch".
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        // Add timeout to prevent hanging in sandbox environments
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Session check timeout")), 3000)
+        )
+        
+        let sessionResult: { data: { session: { user: { id: string; email?: string } } | null } }
+        try {
+          sessionResult = await Promise.race([supabase.auth.getSession(), timeoutPromise])
+        } catch (fetchError) {
+          // Handle "Failed to fetch" from iframe sandbox or timeout
+          const msg = fetchError instanceof Error ? fetchError.message : ""
+          if (msg.includes("Failed to fetch") || msg.includes("Load failed") || msg.includes("timeout")) {
+            console.warn("[v0] Session check failed in preview - showing login form")
+            if (mounted) {
+              sessionCheckCompleted.current = true
+              setCheckingSession(false)
+            }
+            return
+          }
+          throw fetchError
+        }
+        
+        const { data: { session } } = sessionResult
 
         if (!mounted) return
 

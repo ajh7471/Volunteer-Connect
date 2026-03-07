@@ -51,14 +51,31 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         return true
       }
 
-      // Create a timeout promise that rejects after 4 seconds
+      // Create a timeout promise that rejects after 3 seconds
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Auth check timeout")), 4000)
+        setTimeout(() => reject(new Error("Auth check timeout")), 3000)
       )
 
       // Race the session check against the timeout
+      // Note: getSession() can still trigger network calls in Supabase auth lib v2.x
+      // when it detects the session needs refresh
       const sessionPromise = supabase.auth.getSession()
-      const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise])
+      
+      let result: { data: { session: { user: { id: string; email?: string } } | null }; error: Error | null }
+      try {
+        result = await Promise.race([sessionPromise, timeoutPromise])
+      } catch (raceError) {
+        // Handle "Failed to fetch" from iframe sandbox or timeout
+        const msg = raceError instanceof Error ? raceError.message : String(raceError)
+        if (msg.includes("Failed to fetch") || msg.includes("Load failed") || msg.includes("timeout")) {
+          console.warn("[v0] RequireAuth: Network blocked in preview, redirecting to login")
+          setAuthCache(null, false)
+          return false
+        }
+        throw raceError
+      }
+
+      const { data: { session }, error: sessionError } = result
 
       if (sessionError) {
         console.warn("[v0] RequireAuth session error:", sessionError.message)
@@ -75,9 +92,17 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
       setAuthCache(session.user, true)
       return true
     } catch (error) {
-      console.error("[v0] RequireAuth error:", error instanceof Error ? error.message : String(error))
+      const msg = error instanceof Error ? error.message : String(error)
+      console.error("[v0] RequireAuth error:", msg)
+      
+      // Handle network errors - don't retry, just fail fast to login
+      if (msg.includes("Failed to fetch") || msg.includes("Load failed")) {
+        setAuthCache(null, false)
+        return false
+      }
+      
       // Don't retry on timeouts, just fail fast
-      if (retryCount === 0 && !(error instanceof Error && error.message === "Auth check timeout")) {
+      if (retryCount === 0 && !msg.includes("timeout")) {
         await new Promise((resolve) => setTimeout(resolve, 300))
         return checkAuth(retryCount + 1)
       }
