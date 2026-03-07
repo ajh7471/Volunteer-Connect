@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useTransition } from "react"
+import { useState, useEffect, useCallback, useTransition, useMemo } from "react"
 import RequireAuth from "@/app/components/RequireAuth"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { Badge } from "@/components/ui/badge"
 import {
   ChevronLeft, ChevronRight, Plus, Trash2, X, UserPlus,
-  Loader2, AlertCircle, CheckCircle2, Users, CalendarDays, Clock,
+  Loader2, AlertCircle, CheckCircle2, Users, CalendarDays, Clock, CalendarIcon,
 } from "lucide-react"
 import {
   getShiftsForRange, createSingleShift, deleteSingleShift, updateSingleShift,
@@ -19,6 +20,7 @@ import {
   assignShiftToUser, revokeShiftFromUser, getActiveVolunteers,
 } from "@/app/admin/actions"
 import { toast } from "@/lib/toast"
+import { addMonths, ymd, isSameMonth, isSameDay, daysInGrid } from "@/lib/date"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,19 +42,17 @@ type Shift = {
   shift_assignments: Assignment[]
 }
 
-type DayShifts = { [slot: string]: Shift | null }
-type WeekData = { date: Date; dateStr: string; shifts: DayShifts }[]
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SLOTS = ["AM", "MID", "PM"]
 const SLOT_DEFAULTS: Record<string, { start: string; end: string; label: string }> = {
-  AM:  { start: "08:00", end: "12:00", label: "Morning" },
-  MID: { start: "12:00", end: "16:00", label: "Midday" },
-  PM:  { start: "16:00", end: "20:00", label: "Evening" },
+  AM:  { start: "09:00", end: "12:00", label: "Morning" },
+  MID: { start: "12:00", end: "15:00", label: "Midday" },
+  PM:  { start: "15:00", end: "17:00", label: "Evening" },
 }
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-const DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const WEEKDAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,139 +64,230 @@ function fmt12(time: string) {
   return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`
 }
 
-function addDays(d: Date, n: number) {
-  const copy = new Date(d)
-  copy.setDate(copy.getDate() + n)
-  return copy
+function getCapacityStatus(capacity: number, assigned: number): "available" | "nearly-full" | "full" {
+  if (assigned >= capacity) return "full"
+  if (assigned >= capacity * 0.75) return "nearly-full"
+  return "available"
 }
 
-function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0]
-}
+// ─── ShiftIndicator (matches volunteer calendar style) ────────────────────────
 
-function startOfWeek(d: Date) {
-  const copy = new Date(d)
-  copy.setDate(copy.getDate() - copy.getDay())
-  return copy
-}
-
-function buildWeek(base: Date): WeekData {
-  const sun = startOfWeek(base)
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(sun, i)
-    return { date, dateStr: toDateStr(date), shifts: { AM: null, MID: null, PM: null } }
-  })
-}
-
-function fillWeek(weekData: WeekData, shifts: Shift[]): WeekData {
-  const map: Record<string, Shift[]> = {}
-  for (const s of shifts) {
-    if (!map[s.shift_date]) map[s.shift_date] = []
-    map[s.shift_date].push(s)
-  }
-  return weekData.map((day) => {
-    const dayShifts = map[day.dateStr] || []
-    const slotMap: DayShifts = { AM: null, MID: null, PM: null }
-    for (const slot of SLOTS) {
-      slotMap[slot] = dayShifts.find((s) => s.slot === slot) ?? null
-    }
-    return { ...day, shifts: slotMap }
-  })
-}
-
-// ─── FillBadge ────────────────────────────────────────────────────────────────
-
-function FillBadge({ assigned, capacity, size = "sm" }: { assigned: number; capacity: number; size?: "sm" | "lg" }) {
-  const full = assigned >= capacity
-  const close = !full && assigned >= capacity * 0.75
-  const cls = size === "lg" ? "text-sm font-bold px-2.5 py-1" : "text-[11px] font-bold px-2 py-0.5"
-  return (
-    <span className={[
-      cls, "rounded-full tabular-nums",
-      full  ? "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-300"
-           : close ? "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300"
-           : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300",
-    ].join(" ")}>
-      {assigned}/{capacity}
-    </span>
-  )
-}
-
-// ─── ShiftCard ────────────────────────────────────────────────────────────────
-
-function ShiftCard({
-  slot, shift, dateStr, onSelect,
+function AdminShiftIndicator({
+  slot,
+  startTime,
+  endTime,
+  capacity,
+  assignmentsCount,
+  onClick,
 }: {
-  slot: string; shift: Shift | null; dateStr: string
-  onSelect: (shift: Shift | null, slot: string, dateStr: string) => void
+  slot: string
+  startTime: string
+  endTime: string
+  capacity: number
+  assignmentsCount: number
+  onClick: () => void
 }) {
-  const defaults = SLOT_DEFAULTS[slot]
-  const hasShift = !!shift
-  const assigned = shift?.shift_assignments.length ?? 0
-  const capacity = shift?.capacity ?? 0
+  const status = getCapacityStatus(capacity, assignmentsCount)
+
+  const bgColor = {
+    available: "bg-green-500",
+    "nearly-full": "bg-orange-500",
+    full: "bg-red-500",
+  }[status]
+
+  const slotLabel = {
+    AM: "AM",
+    MID: "MID",
+    PM: "PM",
+  }[slot] || slot
 
   return (
     <button
-      onClick={() => onSelect(shift, slot, dateStr)}
-      className={[
-        "w-full text-left rounded-xl border-2 transition-all duration-150 group",
-        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-        hasShift
-          ? "bg-card border-border hover:border-primary/50 hover:shadow-md p-3"
-          : "border-dashed border-border/50 hover:border-primary/40 hover:bg-muted/50 p-3",
-      ].join(" ")}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className={`w-full ${bgColor} text-white text-xs rounded px-1.5 py-1 cursor-pointer hover:opacity-90 transition-opacity text-left`}
     >
-      {hasShift ? (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              {defaults.label}
-            </span>
-            <FillBadge assigned={assigned} capacity={capacity} />
-          </div>
-          <div className="flex items-center gap-1.5 text-sm text-foreground">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            {fmt12(shift.start_time)} – {fmt12(shift.end_time)}
-          </div>
-          {assigned > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Users className="h-3 w-3" />
-              {assigned} volunteer{assigned !== 1 ? "s" : ""} assigned
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-2 text-muted-foreground/60 group-hover:text-primary/70 transition-colors">
-          <Plus className="h-5 w-5 mb-1" />
-          <span className="text-xs font-medium">{defaults.label}</span>
-        </div>
-      )}
+      <div className="flex items-center justify-between gap-1">
+        <span className="font-medium truncate">{slotLabel}</span>
+        <span className="text-[10px] opacity-90 tabular-nums shrink-0">{assignmentsCount}/{capacity}</span>
+      </div>
+      <div className="text-[10px] opacity-80 truncate">
+        {fmt12(startTime)} - {fmt12(endTime)}
+      </div>
     </button>
   )
 }
 
-// ─── ShiftSheet (replaces SidePanel) ──────────────────────────────────────────
+// ─── AdminDayCell (matches volunteer DayCell style) ───────────────────────────
+
+function AdminDayCell({
+  date,
+  currentMonth,
+  shifts,
+  onDayClick,
+  onShiftClick,
+}: {
+  date: Date
+  currentMonth: Date
+  shifts: Shift[]
+  onDayClick: (date: Date) => void
+  onShiftClick: (shift: Shift, slot: string, dateStr: string) => void
+}) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const cellDate = new Date(date)
+  cellDate.setHours(0, 0, 0, 0)
+
+  const isToday = isSameDay(date, new Date())
+  const isCurrentMonth = isSameMonth(date, currentMonth)
+  const isPastDay = cellDate < today
+
+  const dateStr = ymd(date)
+  const dayShifts = shifts.filter((s) => s.shift_date === dateStr)
+
+  const amShift = dayShifts.find((s) => s.slot === "AM")
+  const midShift = dayShifts.find((s) => s.slot === "MID")
+  const pmShift = dayShifts.find((s) => s.slot === "PM")
+
+  return (
+    <div
+      className={`min-h-20 border-b border-r p-1 sm:min-h-24 sm:p-2 ${
+        !isCurrentMonth ? "bg-muted/30" : "bg-background"
+      } ${isToday ? "bg-primary/5 ring-1 ring-inset ring-primary/20" : ""} ${
+        isPastDay ? "bg-muted/50 opacity-60" : "hover:bg-accent"
+      } transition-colors cursor-pointer`}
+      onClick={() => onDayClick(date)}
+    >
+      <div
+        className={`text-sm font-medium ${!isCurrentMonth || isPastDay ? "text-muted-foreground" : ""} ${isToday ? "text-primary font-bold" : ""}`}
+      >
+        {date.getDate()}
+      </div>
+      <div className="mt-1 space-y-1">
+        {amShift && (
+          <AdminShiftIndicator
+            slot="AM"
+            startTime={amShift.start_time}
+            endTime={amShift.end_time}
+            capacity={amShift.capacity}
+            assignmentsCount={amShift.shift_assignments.length}
+            onClick={() => onShiftClick(amShift, "AM", dateStr)}
+          />
+        )}
+        {midShift && (
+          <AdminShiftIndicator
+            slot="MID"
+            startTime={midShift.start_time}
+            endTime={midShift.end_time}
+            capacity={midShift.capacity}
+            assignmentsCount={midShift.shift_assignments.length}
+            onClick={() => onShiftClick(midShift, "MID", dateStr)}
+          />
+        )}
+        {pmShift && (
+          <AdminShiftIndicator
+            slot="PM"
+            startTime={pmShift.start_time}
+            endTime={pmShift.end_time}
+            capacity={pmShift.capacity}
+            assignmentsCount={pmShift.shift_assignments.length}
+            onClick={() => onShiftClick(pmShift, "PM", dateStr)}
+          />
+        )}
+        {/* Show + button if day has no shifts and not past */}
+        {!isPastDay && !amShift && !midShift && !pmShift && isCurrentMonth && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onShiftClick(null as any, "AM", dateStr)
+            }}
+            className="w-full text-muted-foreground/40 hover:text-primary/60 transition-colors flex items-center justify-center py-2"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── AdminMonthlyGrid (matches volunteer MonthlyGrid) ─────────────────────────
+
+function AdminMonthlyGrid({
+  currentMonth,
+  shifts,
+  onDayClick,
+  onShiftClick,
+}: {
+  currentMonth: Date
+  shifts: Shift[]
+  onDayClick: (date: Date) => void
+  onShiftClick: (shift: Shift | null, slot: string, dateStr: string) => void
+}) {
+  const days = daysInGrid(currentMonth)
+
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 border-b bg-muted">
+        {WEEKDAYS.map((day, i) => (
+          <div key={day} className="p-2 text-center text-sm font-semibold">
+            <span className="hidden sm:inline">{day}</span>
+            <span className="sm:hidden" aria-hidden="true">{WEEKDAYS_SHORT[i]}</span>
+            <span className="sr-only sm:hidden">{day}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7">
+        {days.map((date, index) => (
+          <AdminDayCell
+            key={index}
+            date={date}
+            currentMonth={currentMonth}
+            shifts={shifts}
+            onDayClick={onDayClick}
+            onShiftClick={onShiftClick}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── ShiftSheet (admin controls) ──────────────────────────────────────────────
 
 function ShiftSheet({
-  open, shift, slot, dateStr, volunteers, onClose, onRefresh,
+  open, shift, slot, dateStr, volunteers, onClose, onRefresh, onCreate,
 }: {
-  open: boolean; shift: Shift | null; slot: string; dateStr: string
-  volunteers: Volunteer[]; onClose: () => void; onRefresh: () => void
+  open: boolean
+  shift: Shift | null
+  slot: string
+  dateStr: string
+  volunteers: Volunteer[]
+  onClose: () => void
+  onRefresh: () => void
+  onCreate: (dateStr: string, slot: string) => void
 }) {
   const [isPending, startTransition] = useTransition()
   const [assigningId, setAssigningId] = useState("")
   const [editingCapacity, setEditingCapacity] = useState(false)
   const [newCapacity, setNewCapacity] = useState(shift?.capacity?.toString() ?? "3")
-  const [startTime, setStartTime] = useState(shift?.start_time ?? SLOT_DEFAULTS[slot]?.start ?? "08:00")
+  const [startTime, setStartTime] = useState(shift?.start_time ?? SLOT_DEFAULTS[slot]?.start ?? "09:00")
   const [endTime, setEndTime] = useState(shift?.end_time ?? SLOT_DEFAULTS[slot]?.end ?? "12:00")
-  const [capacity, setCapacity] = useState(shift?.capacity?.toString() ?? "3")
+  const [capacity, setCapacity] = useState(shift?.capacity?.toString() ?? "2")
+  const [createSlot, setCreateSlot] = useState(slot)
 
-  // Reset state when shift changes
   useEffect(() => {
-    setNewCapacity(shift?.capacity?.toString() ?? "3")
-    setStartTime(shift?.start_time ?? SLOT_DEFAULTS[slot]?.start ?? "08:00")
+    setNewCapacity(shift?.capacity?.toString() ?? "2")
+    setStartTime(shift?.start_time ?? SLOT_DEFAULTS[slot]?.start ?? "09:00")
     setEndTime(shift?.end_time ?? SLOT_DEFAULTS[slot]?.end ?? "12:00")
-    setCapacity(shift?.capacity?.toString() ?? "3")
+    setCapacity(shift?.capacity?.toString() ?? "2")
+    setCreateSlot(slot)
     setEditingCapacity(false)
     setAssigningId("")
   }, [shift, slot])
@@ -204,19 +295,26 @@ function ShiftSheet({
   const assigned = shift?.shift_assignments ?? []
   const unassigned = volunteers.filter((v) => !assigned.some((a) => a.user_id === v.id))
 
-  const displayDate = new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+  const displayDate = dateStr ? new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
-  })
+  }) : ""
 
   const handleCreate = () => {
     startTransition(async () => {
       const res = await createSingleShift({
-        shift_date: dateStr, slot,
-        start_time: startTime, end_time: endTime,
-        capacity: parseInt(capacity) || 3,
+        shift_date: dateStr,
+        slot: createSlot,
+        start_time: startTime,
+        end_time: endTime,
+        capacity: parseInt(capacity) || 2,
       })
-      if (res.success) { toast.success("Shift created"); onRefresh(); onClose() }
-      else toast.error(res.error || "Failed to create shift")
+      if (res.success) {
+        toast.success("Shift created")
+        onRefresh()
+        onClose()
+      } else {
+        toast.error(res.error || "Failed to create shift")
+      }
     })
   }
 
@@ -224,8 +322,13 @@ function ShiftSheet({
     if (!shift) return
     startTransition(async () => {
       const res = await deleteSingleShift(shift.id)
-      if (res.success) { toast.success("Shift deleted"); onRefresh(); onClose() }
-      else toast.error(res.error || "Failed to delete")
+      if (res.success) {
+        toast.success("Shift deleted")
+        onRefresh()
+        onClose()
+      } else {
+        toast.error(res.error || "Failed to delete")
+      }
     })
   }
 
@@ -238,8 +341,13 @@ function ShiftSheet({
     }
     startTransition(async () => {
       const res = await updateSingleShift(shift.id, { capacity: val })
-      if (res.success) { toast.success("Capacity updated"); setEditingCapacity(false); onRefresh() }
-      else toast.error(res.error || "Failed")
+      if (res.success) {
+        toast.success("Capacity updated")
+        setEditingCapacity(false)
+        onRefresh()
+      } else {
+        toast.error(res.error || "Failed")
+      }
     })
   }
 
@@ -247,24 +355,41 @@ function ShiftSheet({
     if (!shift || !assigningId) return
     startTransition(async () => {
       const res = await assignShiftToUser(assigningId, shift.id)
-      if (res.success) { toast.success("Volunteer assigned"); setAssigningId(""); onRefresh() }
-      else toast.error(res.error || "Failed")
+      if (res.success) {
+        toast.success("Volunteer assigned")
+        setAssigningId("")
+        onRefresh()
+      } else {
+        toast.error(res.error || "Failed")
+      }
     })
   }
 
   const handleRemove = (assignmentId: string, name: string) => {
     startTransition(async () => {
       const res = await revokeShiftFromUser(assignmentId)
-      if (res.success) { toast.success(`${name} removed`); onRefresh() }
-      else toast.error(res.error || "Failed")
+      if (res.success) {
+        toast.success(`${name} removed`)
+        onRefresh()
+      } else {
+        toast.error(res.error || "Failed")
+      }
     })
+  }
+
+  const handleSlotChange = (s: string) => {
+    setCreateSlot(s)
+    setStartTime(SLOT_DEFAULTS[s]?.start ?? "09:00")
+    setEndTime(SLOT_DEFAULTS[s]?.end ?? "12:00")
   }
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader className="text-left pb-4 border-b">
-          <SheetTitle className="text-lg">{SLOT_DEFAULTS[slot]?.label} Shift</SheetTitle>
+          <SheetTitle className="text-lg">
+            {shift ? `${SLOT_DEFAULTS[shift.slot]?.label || shift.slot} Shift` : "Create Shift"}
+          </SheetTitle>
           <SheetDescription>{displayDate}</SheetDescription>
         </SheetHeader>
 
@@ -272,6 +397,21 @@ function ShiftSheet({
           {/* Create new shift */}
           {!shift && (
             <div className="space-y-4">
+              <div>
+                <Label className="text-sm">Time Slot</Label>
+                <Select value={createSlot} onValueChange={handleSlotChange}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SLOTS.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {SLOT_DEFAULTS[s].label} ({s})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-sm">Start Time</Label>
@@ -284,8 +424,14 @@ function ShiftSheet({
               </div>
               <div>
                 <Label className="text-sm">Volunteer Capacity</Label>
-                <Input type="number" min={1} max={50} value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)} className="mt-1.5 w-24" />
+                <Input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                  className="mt-1.5 w-24"
+                />
               </div>
               <Button onClick={handleCreate} disabled={isPending} className="w-full">
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
@@ -303,7 +449,7 @@ function ShiftSheet({
                 <div>
                   <p className="font-medium">{fmt12(shift.start_time)} – {fmt12(shift.end_time)}</p>
                   <p className="text-sm text-muted-foreground">
-                    {Math.round((parseInt(shift.end_time) - parseInt(shift.start_time))} hours
+                    {Math.max(0, parseInt(shift.end_time) - parseInt(shift.start_time))} hours
                   </p>
                 </div>
               </div>
@@ -313,21 +459,50 @@ function ShiftSheet({
                 <div className="flex items-center justify-between mb-3">
                   <Label className="text-sm font-semibold">Capacity</Label>
                   {!editingCapacity && (
-                    <button onClick={() => { setNewCapacity(shift.capacity.toString()); setEditingCapacity(true) }}
-                      className="text-sm text-primary hover:underline">Edit</button>
+                    <button
+                      onClick={() => {
+                        setNewCapacity(shift.capacity.toString())
+                        setEditingCapacity(true)
+                      }}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Edit
+                    </button>
                   )}
                 </div>
                 {editingCapacity ? (
                   <div className="flex items-center gap-2">
-                    <Input type="number" min={1} max={50} value={newCapacity}
-                      onChange={(e) => setNewCapacity(e.target.value)} className="w-24" />
-                    <Button size="sm" onClick={handleUpdateCapacity} disabled={isPending}>Save</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingCapacity(false)}>Cancel</Button>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={newCapacity}
+                      onChange={(e) => setNewCapacity(e.target.value)}
+                      className="w-24"
+                    />
+                    <Button size="sm" onClick={handleUpdateCapacity} disabled={isPending}>
+                      Save
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingCapacity(false)}>
+                      Cancel
+                    </Button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <FillBadge assigned={assigned.length} capacity={shift.capacity} size="lg" />
-                    <span className="text-sm text-muted-foreground">{assigned.length} of {shift.capacity} spots filled</span>
+                    <Badge
+                      variant={
+                        assigned.length >= shift.capacity
+                          ? "destructive"
+                          : assigned.length >= shift.capacity * 0.75
+                            ? "secondary"
+                            : "default"
+                      }
+                    >
+                      {assigned.length}/{shift.capacity}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {assigned.length} of {shift.capacity} spots filled
+                    </span>
                   </div>
                 )}
               </div>
@@ -413,6 +588,153 @@ function ShiftSheet({
   )
 }
 
+// ─── CalendarTab (monthly view like volunteer) ────────────────────────────────
+
+function CalendarTab() {
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [shifts, setShifts] = useState<Shift[]>([])
+  const [loading, setLoading] = useState(true)
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [selected, setSelected] = useState<{ shift: Shift | null; slot: string; dateStr: string } | null>(null)
+
+  const monthName = useMemo(
+    () => currentMonth.toLocaleString("default", { month: "long", year: "numeric" }),
+    [currentMonth],
+  )
+
+  const loadMonthData = useCallback(async () => {
+    setLoading(true)
+
+    // Calculate month range
+    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+    const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
+
+    // Extend to full weeks for the grid
+    const gridStart = new Date(firstDay)
+    gridStart.setDate(gridStart.getDate() - gridStart.getDay())
+    const gridEnd = new Date(lastDay)
+    gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()))
+
+    const startDate = ymd(gridStart)
+    const endDate = ymd(gridEnd)
+
+    const [shiftsRes, volsRes] = await Promise.all([
+      getShiftsForRange(startDate, endDate),
+      getActiveVolunteers(),
+    ])
+
+    if (shiftsRes.success) {
+      setShifts((shiftsRes.shifts as unknown as Shift[]) || [])
+    }
+    if (volsRes.success) {
+      setVolunteers((volsRes.volunteers as Volunteer[]) || [])
+    }
+    setLoading(false)
+  }, [currentMonth])
+
+  useEffect(() => {
+    loadMonthData()
+  }, [loadMonthData])
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, -1))
+    setSelected(null)
+  }
+
+  const handleNextMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, 1))
+    setSelected(null)
+  }
+
+  const handleDayClick = (date: Date) => {
+    // Open create shift sheet for this date
+    setSelected({ shift: null, slot: "AM", dateStr: ymd(date) })
+  }
+
+  const handleShiftClick = (shift: Shift | null, slot: string, dateStr: string) => {
+    setSelected({ shift, slot, dateStr })
+  }
+
+  const handleRefresh = async () => {
+    await loadMonthData()
+    // Update selected shift if still selected
+    if (selected?.shift) {
+      const updatedShift = shifts.find((s) => s.id === selected.shift?.id)
+      if (updatedShift) {
+        setSelected({ ...selected, shift: updatedShift })
+      }
+    }
+  }
+
+  return (
+    <>
+      <div className="p-6 space-y-6">
+        {/* Month navigation */}
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+              <span className="text-lg font-semibold">{monthName}</span>
+              {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            </div>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Legend */}
+        <Card>
+          <CardContent className="flex flex-wrap gap-x-4 gap-y-2 py-3 px-4">
+            {[
+              { color: "bg-green-500", label: "Available" },
+              { color: "bg-orange-500", label: "Nearly Full" },
+              { color: "bg-red-500", label: "Full" },
+              { color: "bg-gray-300 dark:bg-gray-600", label: "Not Available" },
+            ].map(({ color, label }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <div className={`h-3 w-6 rounded-sm ${color}`} />
+                <span className="text-xs text-muted-foreground">{label}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Calendar grid */}
+        {loading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : (
+          <AdminMonthlyGrid
+            currentMonth={currentMonth}
+            shifts={shifts}
+            onDayClick={handleDayClick}
+            onShiftClick={handleShiftClick}
+          />
+        )}
+      </div>
+
+      {/* Shift detail sheet */}
+      <ShiftSheet
+        open={!!selected}
+        shift={selected?.shift ?? null}
+        slot={selected?.slot ?? "AM"}
+        dateStr={selected?.dateStr ?? ""}
+        volunteers={volunteers}
+        onClose={() => setSelected(null)}
+        onRefresh={handleRefresh}
+        onCreate={(dateStr, slot) => setSelected({ shift: null, slot, dateStr })}
+      />
+    </>
+  )
+}
+
 // ─── BulkOpsTab ───────────────────────────────────────────────────────────────
 
 function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
@@ -420,9 +742,9 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
 
   // Create form
   const [cSlot, setCSlot] = useState("AM")
-  const [cStart, setCStart] = useState("08:00")
+  const [cStart, setCStart] = useState("09:00")
   const [cEnd, setCEnd] = useState("12:00")
-  const [cCapacity, setCCapacity] = useState("3")
+  const [cCapacity, setCCapacity] = useState("2")
   const [cDateStart, setCDateStart] = useState("")
   const [cDateEnd, setCDateEnd] = useState("")
   const [cDays, setCDays] = useState<number[]>([1, 2, 3, 4, 5])
@@ -440,72 +762,110 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
   const [uDateStart, setUDateStart] = useState("")
   const [uDateEnd, setUDateEnd] = useState("")
   const [uSlot, setUSlot] = useState("all")
-  const [uCapacity, setUCapacity] = useState("3")
+  const [uCapacity, setUCapacity] = useState("2")
   const [uResult, setUResult] = useState<string | null>(null)
 
   const computePreview = () => {
-    if (!cDateStart || !cDateEnd || cDays.length === 0) { setCPreview(0); return }
+    if (!cDateStart || !cDateEnd || cDays.length === 0) {
+      setCPreview(0)
+      return
+    }
     let count = 0
     const cur = new Date(cDateStart + "T00:00:00")
     const end = new Date(cDateEnd + "T00:00:00")
-    while (cur <= end) { if (cDays.includes(cur.getDay())) count++; cur.setDate(cur.getDate() + 1) }
+    while (cur <= end) {
+      if (cDays.includes(cur.getDay())) count++
+      cur.setDate(cur.getDate() + 1)
+    }
     setCPreview(count)
   }
 
   const toggleDay = (d: number) =>
-    setCDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort())
+    setCDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()))
 
   const handleSlotChange = (s: string) => {
     setCSlot(s)
-    setCStart(SLOT_DEFAULTS[s]?.start ?? "08:00")
+    setCStart(SLOT_DEFAULTS[s]?.start ?? "09:00")
     setCEnd(SLOT_DEFAULTS[s]?.end ?? "12:00")
   }
 
   const handleCreate = () => {
-    if (!cDateStart || !cDateEnd) { toast.error("Select a date range"); return }
-    if (cDays.length === 0) { toast.error("Select at least one day of week"); return }
+    if (!cDateStart || !cDateEnd) {
+      toast.error("Select a date range")
+      return
+    }
+    if (cDays.length === 0) {
+      toast.error("Select at least one day of week")
+      return
+    }
     startTransition(async () => {
       setCResult(null)
       const res = await bulkCreateShifts({
-        slot: cSlot, startTime: cStart, endTime: cEnd,
-        capacity: parseInt(cCapacity) || 3,
-        startDate: cDateStart, endDate: cDateEnd, daysOfWeek: cDays,
+        slot: cSlot,
+        startTime: cStart,
+        endTime: cEnd,
+        capacity: parseInt(cCapacity) || 2,
+        startDate: cDateStart,
+        endDate: cDateEnd,
+        daysOfWeek: cDays,
       })
-      if (res.success) { setCResult(`Created ${res.created} shifts, skipped ${res.skipped} existing`); onRefresh() }
-      else toast.error(res.error || "Failed")
+      if (res.success) {
+        setCResult(`Created ${res.created} shifts, skipped ${res.skipped} existing`)
+        onRefresh()
+      } else {
+        toast.error(res.error || "Failed")
+      }
     })
   }
 
   const handleDelete = () => {
-    if (!dDateStart || !dDateEnd) { toast.error("Select a date range"); return }
+    if (!dDateStart || !dDateEnd) {
+      toast.error("Select a date range")
+      return
+    }
     startTransition(async () => {
       setDResult(null)
       const res = await bulkDeleteShifts({
-        startDate: dDateStart, endDate: dDateEnd,
-        slot: dSlot === "all" ? undefined : dSlot, onlyEmpty: dOnlyEmpty,
+        startDate: dDateStart,
+        endDate: dDateEnd,
+        slot: dSlot === "all" ? undefined : dSlot,
+        onlyEmpty: dOnlyEmpty,
       })
-      if (res.success) { setDResult(`Deleted ${res.deleted} shifts, skipped ${res.skipped}`); onRefresh() }
-      else toast.error(res.error || "Failed")
+      if (res.success) {
+        setDResult(`Deleted ${res.deleted} shifts, skipped ${res.skipped}`)
+        onRefresh()
+      } else {
+        toast.error(res.error || "Failed")
+      }
     })
   }
 
   const handleCapacity = () => {
-    if (!uDateStart || !uDateEnd) { toast.error("Select a date range"); return }
+    if (!uDateStart || !uDateEnd) {
+      toast.error("Select a date range")
+      return
+    }
     startTransition(async () => {
       setUResult(null)
       const res = await bulkUpdateCapacity({
-        startDate: uDateStart, endDate: uDateEnd,
+        startDate: uDateStart,
+        endDate: uDateEnd,
         slot: uSlot === "all" ? undefined : uSlot,
-        capacity: parseInt(uCapacity) || 3,
+        capacity: parseInt(uCapacity) || 2,
       })
-      if (res.success) { setUResult(`Updated ${res.updated} shifts`); onRefresh() }
-      else toast.error(res.error || "Failed")
+      if (res.success) {
+        setUResult(`Updated ${res.updated} shifts`)
+        onRefresh()
+      } else {
+        toast.error(res.error || "Failed")
+      }
     })
   }
 
   const ResultBanner = ({ msg }: { msg: string }) => (
     <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
-      <CheckCircle2 className="h-4 w-4 shrink-0" />{msg}
+      <CheckCircle2 className="h-4 w-4 shrink-0" />
+      {msg}
     </div>
   )
 
@@ -525,9 +885,15 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
             <div>
               <Label>Time Slot</Label>
               <Select value={cSlot} onValueChange={handleSlotChange}>
-                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_DEFAULTS[s].label} ({s})</SelectItem>)}
+                  {SLOTS.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SLOT_DEFAULTS[s].label} ({s})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -543,8 +909,14 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
             </div>
             <div>
               <Label>Capacity</Label>
-              <Input type="number" min={1} max={50} value={cCapacity}
-                onChange={(e) => setCCapacity(e.target.value)} className="mt-1.5 w-24" />
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={cCapacity}
+                onChange={(e) => setCCapacity(e.target.value)}
+                className="mt-1.5 w-24"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -560,13 +932,16 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
               <Label className="mb-2 block">Days of Week</Label>
               <div className="flex flex-wrap gap-1.5">
                 {DOW_LABELS.map((d, i) => (
-                  <button key={i} onClick={() => toggleDay(i)}
+                  <button
+                    key={i}
+                    onClick={() => toggleDay(i)}
                     className={[
                       "px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors",
                       cDays.includes(i)
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background text-muted-foreground border-border hover:border-primary/60",
-                    ].join(" ")}>
+                    ].join(" ")}
+                  >
                     {d}
                   </button>
                 ))}
@@ -578,9 +953,12 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
               </p>
             )}
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" onClick={computePreview} className="flex-1">Preview</Button>
+              <Button variant="outline" onClick={computePreview} className="flex-1">
+                Preview
+              </Button>
               <Button onClick={handleCreate} disabled={isPending} className="flex-1">
-                {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Create
+                {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Create
               </Button>
             </div>
             {cResult && <ResultBanner msg={cResult} />}
@@ -610,16 +988,26 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
             <div>
               <Label>Slot Filter</Label>
               <Select value={dSlot} onValueChange={setDSlot}>
-                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Slots</SelectItem>
-                  {SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_DEFAULTS[s].label} ({s})</SelectItem>)}
+                  {SLOTS.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SLOT_DEFAULTS[s].label} ({s})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <label className="flex items-start gap-3 cursor-pointer py-1">
-              <input type="checkbox" checked={dOnlyEmpty} onChange={(e) => setDOnlyEmpty(e.target.checked)}
-                className="rounded mt-0.5" />
+              <input
+                type="checkbox"
+                checked={dOnlyEmpty}
+                onChange={(e) => setDOnlyEmpty(e.target.checked)}
+                className="rounded mt-0.5"
+              />
               <span className="text-sm">Only delete shifts with no assignments</span>
             </label>
             {!dOnlyEmpty && (
@@ -630,7 +1018,8 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
             )}
             <Button variant="destructive" onClick={handleDelete} disabled={isPending} className="w-full">
               {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              <Trash2 className="h-4 w-4 mr-2" />Delete Shifts
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Shifts
             </Button>
             {dResult && <ResultBanner msg={dResult} />}
           </CardContent>
@@ -659,17 +1048,29 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
             <div>
               <Label>Slot Filter</Label>
               <Select value={uSlot} onValueChange={setUSlot}>
-                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Slots</SelectItem>
-                  {SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_DEFAULTS[s].label} ({s})</SelectItem>)}
+                  {SLOTS.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SLOT_DEFAULTS[s].label} ({s})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>New Capacity</Label>
-              <Input type="number" min={1} max={50} value={uCapacity}
-                onChange={(e) => setUCapacity(e.target.value)} className="mt-1.5 w-24" />
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={uCapacity}
+                onChange={(e) => setUCapacity(e.target.value)}
+                className="mt-1.5 w-24"
+              />
             </div>
             <Button onClick={handleCapacity} disabled={isPending} className="w-full">
               {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -683,157 +1084,6 @@ function BulkOpsTab({ onRefresh }: { onRefresh: () => void }) {
   )
 }
 
-// ─── WeekGridTab ──────────────────────────────────────────────────────────────
-
-function WeekGridTab() {
-  const [weekBase, setWeekBase] = useState(() => startOfWeek(new Date()))
-  const [weekData, setWeekData] = useState<WeekData>([])
-  const [loading, setLoading] = useState(true)
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
-  const [selected, setSelected] = useState<{ shift: Shift | null; slot: string; dateStr: string } | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    const blank = buildWeek(weekBase)
-    const startDate = toDateStr(blank[0].date)
-    const endDate = toDateStr(blank[6].date)
-
-    const [shiftsRes, volsRes] = await Promise.all([
-      getShiftsForRange(startDate, endDate),
-      getActiveVolunteers(),
-    ])
-
-    if (shiftsRes.success) {
-      setWeekData(fillWeek(blank, (shiftsRes.shifts as unknown as Shift[]) || []))
-    } else {
-      setWeekData(blank)
-    }
-    if (volsRes.success) setVolunteers((volsRes.volunteers as Volunteer[]) || [])
-    setLoading(false)
-  }, [weekBase])
-
-  useEffect(() => { load() }, [load])
-
-  const prevWeek = () => setWeekBase((d) => addDays(d, -7))
-  const nextWeek = () => setWeekBase((d) => addDays(d, 7))
-  const goToday = () => { setWeekBase(startOfWeek(new Date())); setSelected(null) }
-
-  const handleSelect = (shift: Shift | null, slot: string, dateStr: string) => {
-    setSelected({ shift, slot, dateStr })
-  }
-
-  const weekLabel = weekData.length === 7
-    ? `${weekData[0].date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekData[6].date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-    : ""
-
-  const today = toDateStr(new Date())
-
-  // Refresh selected shift data after changes
-  const handleRefresh = async () => {
-    await load()
-    // Update selected shift if still selected
-    if (selected) {
-      const newWeek = buildWeek(weekBase)
-      const startDate = toDateStr(newWeek[0].date)
-      const endDate = toDateStr(newWeek[6].date)
-      const res = await getShiftsForRange(startDate, endDate)
-      if (res.success) {
-        const filled = fillWeek(newWeek, (res.shifts as unknown as Shift[]) || [])
-        const day = filled.find((d) => d.dateStr === selected.dateStr)
-        if (day) {
-          setSelected({ ...selected, shift: day.shifts[selected.slot] })
-        }
-      }
-    }
-  }
-
-  return (
-    <>
-      <div className="flex flex-col h-full">
-        {/* Week nav bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" onClick={prevWeek} className="h-9 w-9">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <h2 className="text-lg font-semibold min-w-[260px] text-center">{weekLabel}</h2>
-            <Button variant="outline" size="icon" onClick={nextWeek} className="h-9 w-9">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" onClick={goToday} className="ml-2">Today</Button>
-            {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-2" />}
-          </div>
-          <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-emerald-500" />Open</span>
-            <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-amber-500" />Near full</span>
-            <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-500" />Full</span>
-          </div>
-        </div>
-
-        {/* Week grid */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="grid grid-cols-7 gap-4">
-            {/* Day columns */}
-            {weekData.map((day) => {
-              const isToday = day.dateStr === today
-              const isPast = day.dateStr < today
-              return (
-                <div key={day.dateStr} className={["space-y-3", isPast ? "opacity-60" : ""].join(" ")}>
-                  {/* Day header */}
-                  <div className="text-center pb-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      {DOW_LABELS[day.date.getDay()]}
-                    </p>
-                    <span className={[
-                      "inline-flex items-center justify-center w-10 h-10 rounded-full text-lg font-bold mt-1",
-                      isToday ? "bg-primary text-primary-foreground" : "text-foreground",
-                    ].join(" ")}>
-                      {day.date.getDate()}
-                    </span>
-                  </div>
-
-                  {/* Shift cards */}
-                  {SLOTS.map((slot) => (
-                    <ShiftCard
-                      key={slot}
-                      slot={slot}
-                      shift={day.shifts[slot]}
-                      dateStr={day.dateStr}
-                      onSelect={handleSelect}
-                    />
-                  ))}
-                </div>
-              )
-            })}
-          </div>
-
-          {!loading && weekData.length > 0 && weekData.every((d) => SLOTS.every((s) => !d.shifts[s])) && (
-            <div className="mt-8 text-center">
-              <p className="text-muted-foreground mb-3">No shifts this week.</p>
-              <Button variant="outline" onClick={() => {
-                document.querySelector<HTMLButtonElement>('[data-value="bulk"]')?.click()
-              }}>
-                Create Recurring Shifts
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Shift detail sheet */}
-      <ShiftSheet
-        open={!!selected}
-        shift={selected?.shift ?? null}
-        slot={selected?.slot ?? "AM"}
-        dateStr={selected?.dateStr ?? ""}
-        volunteers={volunteers}
-        onClose={() => setSelected(null)}
-        onRefresh={handleRefresh}
-      />
-    </>
-  )
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminShiftsPage() {
@@ -841,41 +1091,31 @@ export default function AdminShiftsPage() {
 
   return (
     <RequireAuth>
-      <div className="flex flex-col h-[calc(100vh-64px)]">
+      <div className="space-y-6">
         {/* Page header */}
-        <div className="border-b bg-card px-6 py-5 shrink-0">
-          <h1 className="text-2xl font-bold text-foreground">Shift Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Create shifts, assign volunteers, and manage your schedule
-          </p>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Shift Management</h1>
+          <p className="text-muted-foreground">Create shifts, assign volunteers, and manage your schedule</p>
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="week" className="flex-1 flex flex-col min-h-0">
-          <div className="border-b bg-card px-6 shrink-0">
-            <TabsList className="h-12 bg-transparent p-0 gap-6">
-              {[
-                { value: "week", label: "Week View", icon: CalendarDays },
-                { value: "bulk", label: "Bulk Operations", icon: Users },
-              ].map(({ value, label, icon: Icon }) => (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  data-value={value}
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 pb-3 pt-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground flex items-center gap-2"
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
+        <Tabs defaultValue="calendar" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="calendar" className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              Calendar View
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Bulk Operations
+            </TabsTrigger>
+          </TabsList>
 
-          <TabsContent value="week" className="flex-1 min-h-0 mt-0 overflow-hidden">
-            <WeekGridTab key={refreshKey} />
+          <TabsContent value="calendar" className="mt-0">
+            <CalendarTab key={refreshKey} />
           </TabsContent>
 
-          <TabsContent value="bulk" className="flex-1 min-h-0 mt-0 overflow-auto">
+          <TabsContent value="bulk" className="mt-0">
             <BulkOpsTab onRefresh={() => setRefreshKey((k) => k + 1)} />
           </TabsContent>
         </Tabs>
