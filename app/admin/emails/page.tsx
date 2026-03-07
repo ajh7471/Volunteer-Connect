@@ -20,8 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "@/lib/toast"
-import { Mail, Send, Users } from 'lucide-react'
+import { Mail, Send, Users } from "lucide-react"
 
 type EmailLog = {
   id: string
@@ -179,8 +180,8 @@ export default function AdminEmailsPage() {
       <div className="space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Email Communications</h1>
-            <p className="text-muted-foreground">Send emails to volunteers who opted in</p>
+            <h1 className="text-2xl font-bold tracking-tight">Email Communications</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Send emails to volunteers who opted in</p>
           </div>
           <Button onClick={() => setShowComposeModal(true)}>
             <Mail className="mr-2 h-4 w-4" />
@@ -189,34 +190,26 @@ export default function AdminEmailsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Opted-In Volunteers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{volunteers.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Emails Sent</CardTitle>
-              <Send className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{emailLogs.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">From Address</CardTitle>
-              <Mail className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-mono">volunteer@vanderpumpdogs.org</div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { icon: Users, label: "Opted-In", value: volunteers.length },
+            { icon: Send,  label: "Emails Sent", value: emailLogs.length },
+          ].map(({ icon: Icon, label, value }) => (
+            <div key={label} className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 flex items-center gap-3">
+              <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-lg font-bold leading-none">{value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+              </div>
+            </div>
+          ))}
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 flex items-center gap-3">
+            <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-xs font-mono text-foreground leading-snug">volunteer@vanderpumpdogs.org</p>
+              <p className="text-xs text-muted-foreground mt-0.5">From address</p>
+            </div>
+          </div>
         </div>
 
         {/* Email History */}
@@ -261,103 +254,114 @@ export default function AdminEmailsPage() {
           </CardContent>
         </Card>
 
-        {/* Compose Email Modal */}
+        {/* Compose Email Dialog */}
         <Dialog open={showComposeModal} onOpenChange={setShowComposeModal}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Compose Email</DialogTitle>
-              <DialogDescription>Send email to volunteers from volunteer@vanderpumpdogs.org</DialogDescription>
+          <DialogContent className="sm:max-w-lg p-0 gap-0">
+            <DialogHeader className="px-5 pt-5 pb-4 border-b">
+              <DialogTitle className="text-base font-semibold">Compose Email</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Send from volunteer@vanderpumpdogs.org
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email-type">Email Type</Label>
-                <Select value={emailType} onValueChange={setEmailType}>
-                  <SelectTrigger id="email-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="reminder">Shift Reminder</SelectItem>
-                    <SelectItem value="confirmation">Booking Confirmation</SelectItem>
-                    <SelectItem value="promotional">Promotional</SelectItem>
-                    <SelectItem value="urgent">Urgent Notification</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject</Label>
-                <Input
-                  id="subject"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Email subject line"
-                />
-              </div>
+            <ScrollArea className="max-h-[72vh]">
+              <div className="px-5 py-4 space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Email Type</Label>
+                  <Select value={emailType} onValueChange={setEmailType}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="reminder">Shift Reminder</SelectItem>
+                      <SelectItem value="confirmation">Booking Confirmation</SelectItem>
+                      <SelectItem value="promotional">Promotional</SelectItem>
+                      <SelectItem value="urgent">Urgent Notification</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="message">Message</Label>
-                <Textarea
-                  id="message"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Email message content"
-                  rows={6}
-                />
-              </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Subject</Label>
+                  <Input
+                    className="h-9 text-sm"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="Email subject line"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Recipients ({selectedRecipients.length} selected)</Label>
-                  <div className="flex gap-2">
-                    <Select value={filterCategory} onValueChange={setFilterCategory}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Opted-In</SelectItem>
-                        <SelectItem value="reminders">Reminders Only</SelectItem>
-                        <SelectItem value="confirmations">Confirmations Only</SelectItem>
-                        <SelectItem value="promotional">Promotional Only</SelectItem>
-                        <SelectItem value="urgent">Urgent Only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                      Select All
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleDeselectAll}>
-                      Deselect All
-                    </Button>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Message</Label>
+                  <Textarea
+                    className="text-sm resize-none"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Email message content"
+                    rows={5}
+                  />
+                </div>
+
+                {/* Recipients */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">
+                      Recipients{" "}
+                      <span className="text-muted-foreground">({selectedRecipients.length} selected)</span>
+                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Select value={filterCategory} onValueChange={setFilterCategory}>
+                        <SelectTrigger className="h-7 text-xs w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Opted-In</SelectItem>
+                          <SelectItem value="reminders">Reminders</SelectItem>
+                          <SelectItem value="confirmations">Confirmations</SelectItem>
+                          <SelectItem value="promotional">Promotional</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={handleSelectAll}>
+                        All
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={handleDeselectAll}>
+                        None
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-lg border bg-muted/20 p-3">
+                    {filteredVolunteers.length === 0 ? (
+                      <p className="text-center text-xs text-muted-foreground py-2">No volunteers match this category</p>
+                    ) : (
+                      filteredVolunteers.map((volunteer) => (
+                        <div key={volunteer.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={volunteer.id}
+                            checked={selectedRecipients.includes(volunteer.id)}
+                            onCheckedChange={() => handleToggleRecipient(volunteer.id)}
+                          />
+                          <Label htmlFor={volunteer.id} className="cursor-pointer text-xs font-normal leading-snug">
+                            {volunteer.name}
+                            <span className="text-muted-foreground ml-1">({volunteer.email})</span>
+                          </Label>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
-                <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border p-3">
-                  {filteredVolunteers.length === 0 ? (
-                    <p className="text-center text-sm text-muted-foreground">No volunteers match this category</p>
-                  ) : (
-                    filteredVolunteers.map((volunteer) => (
-                      <div key={volunteer.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={volunteer.id}
-                          checked={selectedRecipients.includes(volunteer.id)}
-                          onCheckedChange={() => handleToggleRecipient(volunteer.id)}
-                        />
-                        <Label htmlFor={volunteer.id} className="cursor-pointer text-sm font-normal">
-                          {volunteer.name} ({volunteer.email})
-                        </Label>
-                      </div>
-                    ))
-                  )}
-                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowComposeModal(false)}>
+            </ScrollArea>
+
+            <div className="px-5 py-3 border-t flex gap-2">
+              <Button variant="outline" className="flex-1 h-9 text-sm" onClick={() => setShowComposeModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSendEmail}>
-                <Send className="mr-2 h-4 w-4" />
+              <Button className="flex-1 h-9 text-sm" onClick={handleSendEmail}>
+                <Send className="mr-1.5 h-3.5 w-3.5" />
                 Send Email
               </Button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

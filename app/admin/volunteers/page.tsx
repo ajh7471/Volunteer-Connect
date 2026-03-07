@@ -99,39 +99,39 @@ export default function VolunteersPage() {
       <div className="space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Manage Volunteers</h1>
-            <p className="text-muted-foreground">View and manage all volunteer accounts</p>
+            <h1 className="text-2xl font-bold tracking-tight">Manage Volunteers</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">View and manage all volunteer accounts</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={exportToCSV} disabled={filtered.length === 0}>
-              <Download className="mr-2 h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filtered.length === 0}>
+              <Download className="mr-2 h-3.5 w-3.5" />
               Export CSV
             </Button>
-            <Button asChild>
-              <Link href="/admin">Back to Dashboard</Link>
+            <Button asChild size="sm">
+              <Link href="/admin">Dashboard</Link>
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Volunteer Directory</CardTitle>
-            <CardDescription>Search and manage volunteer profiles ({filtered.length} total)</CardDescription>
+            <CardTitle className="text-sm font-semibold">Volunteer Directory</CardTitle>
+            <CardDescription className="text-xs">Search and manage volunteer profiles ({filtered.length} total)</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="flex flex-1 items-center gap-2">
-                <Search className="h-5 w-5 text-muted-foreground" />
+                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
                 <Input
                   placeholder="Search by name, email, phone, or ID..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="max-w-sm"
+                  className="h-8 text-sm max-w-sm"
                 />
               </div>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="h-8 text-sm w-full sm:w-[160px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
