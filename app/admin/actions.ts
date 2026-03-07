@@ -258,7 +258,7 @@ export async function assignShiftToUser(userId: string, shiftId: string) {
     .select("id")
     .eq("user_id", userId)
     .eq("shift_id", shiftId)
-    .single()
+    .maybeSingle()
 
   if (existing) {
     return { success: false, error: "User already assigned to this shift" }
