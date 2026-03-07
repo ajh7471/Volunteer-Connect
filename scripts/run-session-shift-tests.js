@@ -83,7 +83,7 @@ function makeSessionManager(config = {}) {
 
   function startSession(userId) {
     if (state.isAuthenticated && state.userId === userId && state.sessionToken) return false // duplicate guard
-    const token = `tok-${userId}-${Date.now()}`
+    const token = `tok-${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     update({ isAuthenticated: true, userId, sessionToken: token, lastActivity: Date.now(), isIdle: false })
     events.push("session_start")
     return true
