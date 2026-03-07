@@ -1053,9 +1053,8 @@ function CalendarTab() {
     setCurrentMonth(addMonths(currentMonth, 1))
   }
 
-  const handleDayClick = (date: Date) => {
-    // Open add shift dialog for this date
-    setAddDialogDate(ymd(date))
+  const handleDayClick = (_date: Date) => {
+    // Day clicks do not open the add dialog — use the Add Shift button instead
   }
 
   const handleShiftClick = (shift: Shift | null, _slot: string, _dateStr: string) => {
@@ -1078,33 +1077,31 @@ function CalendarTab() {
   return (
     <>
       <div className="space-y-4 sm:space-y-6">
-        {/* Month navigation + Add button */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Card className="flex-1">
-            <CardContent className="flex items-center justify-between p-3 sm:p-4">
+        {/* Month navigation + Add button — all in one card */}
+        <Card>
+          <CardContent className="flex items-center justify-between p-3 sm:p-4">
+            <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={handlePrevMonth}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-muted-foreground hidden sm:block" />
-                <span className="text-base sm:text-lg font-semibold">{monthName}</span>
-                {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-              </div>
               <Button variant="outline" size="icon" onClick={handleNextMonth}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
-            </CardContent>
-          </Card>
-          
-          <Button
-            size="lg"
-            className="h-12 sm:h-auto"
-            onClick={() => setAddDialogDate(ymd(new Date()))}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Add Shift
-          </Button>
-        </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-muted-foreground hidden sm:block" />
+              <span className="text-base sm:text-lg font-semibold">{monthName}</span>
+              {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            </div>
+            <Button
+              onClick={() => setAddDialogDate(ymd(new Date()))}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              Add Shift
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Legend */}
         <Card>
