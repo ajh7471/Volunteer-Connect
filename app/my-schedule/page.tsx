@@ -57,15 +57,32 @@ export default function MySchedulePage() {
   }, [])
 
   async function loadAssignments() {
-    const { data: sessionData } = await supabase.auth.getSession()
-    const uid = sessionData.session?.user?.id
+    try {
+      const sessionPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 3000)
+      )
+      let result: { data: { session: { user: { id: string; email?: string } } | null } }
+      try {
+        result = await Promise.race([sessionPromise, timeoutPromise])
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : ""
+        if (msg.includes("Failed to fetch") || msg.includes("timeout") || msg.includes("Load failed")) {
+          setLoading(false)
+          return
+        }
+        throw err
+      }
+      
+      const { data: sessionData } = result
+      const uid = sessionData.session?.user?.id
 
-    if (!uid) {
-      setLoading(false)
-      return
-    }
+      if (!uid) {
+        setLoading(false)
+        return
+      }
 
-    setUserId(uid)
+      setUserId(uid)
 
     // Get upcoming assignments and waitlist in parallel
     const today = ymd(new Date())

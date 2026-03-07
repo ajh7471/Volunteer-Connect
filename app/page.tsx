@@ -32,7 +32,30 @@ export default function HomePage() {
     // exists we redirect immediately; if not we show the login form.
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        // Add a timeout wrapper to prevent hanging on slow/blocked network
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Session check timeout")), 3000)
+        )
+
+        let result: { data: { session: { user: { id: string; email?: string } } | null } }
+        try {
+          result = await Promise.race([sessionPromise, timeoutPromise])
+        } catch (err) {
+          // Handle network errors and timeouts gracefully
+          const msg = err instanceof Error ? err.message : ""
+          if (msg.includes("Failed to fetch") || msg.includes("timeout") || msg.includes("Load failed")) {
+            // Network unavailable or timeout - just show login form
+            if (mounted) {
+              sessionCheckCompleted.current = true
+              setCheckingSession(false)
+            }
+            return
+          }
+          throw err
+        }
+
+        const { data: { session } } = result
 
         if (!mounted) return
 
