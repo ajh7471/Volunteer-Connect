@@ -27,7 +27,6 @@ export const metadata: Metadata = {
   description: "Coordinate volunteer shifts at Vanderpump Dogs with ease. Sign up for shifts, manage your schedule, and connect with fellow volunteers.",
   manifest: "/manifest.json",
   appleWebApp: {
-    capable: true,
     statusBarStyle: "default",
     title: "VP Volunteer",
   },
