@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react"
 import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
+import { useSessionRole } from "@/lib/useSession"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Download, TrendingUp, AlertCircle, CheckCircle, Users } from 'lucide-react'
-import { supabase } from "@/lib/supabaseClient"
+import { Download, TrendingUp, AlertCircle, CheckCircle, Users } from 'lucide-react'
 import {
   getShiftFillRates,
   getShiftStatistics,
@@ -20,7 +20,10 @@ import Link from "next/link"
 
 export default function ShiftAnalyticsPage() {
   const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  // Use session hook for efficient role checking — no extra network call
+  const { role, loading: roleLoading } = useSessionRole()
+  const isAdmin = roleLoading ? null : role === "admin"
+
   const [startDate, setStartDate] = useState<string>("")
   const [endDate, setEndDate] = useState<string>("")
   const [fillRates, setFillRates] = useState<ShiftFillRate[]>([])
@@ -35,27 +38,6 @@ export default function ShiftAnalyticsPage() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     setStartDate(thirtyDaysAgo.toISOString().split("T")[0])
     setEndDate(today.toISOString().split("T")[0])
-  }, [])
-
-  // Check admin role
-  useEffect(() => {
-    ;(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setIsAdmin(false)
-        return
-      }
-
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
-
-      if (data?.role === "admin") {
-        setIsAdmin(true)
-      } else {
-        setIsAdmin(false)
-      }
-    })()
   }, [])
 
   async function loadShiftAnalytics() {
