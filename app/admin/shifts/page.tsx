@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   ChevronLeft, ChevronRight, Plus, Trash2, X, UserPlus,
-  Loader2, AlertCircle, CheckCircle2, Users, CalendarDays, Clock, CalendarIcon,
-  Repeat, Calendar as CalendarSimple,
+  Loader2, AlertCircle, Users, CalendarDays, Clock, CalendarIcon,
+  Pencil,
 } from "lucide-react"
 import {
   getShiftsForRange, createSingleShift, deleteSingleShift, updateSingleShift,
@@ -316,42 +316,72 @@ function AdminMonthlyGrid({
   )
 }
 
-// ─── EditShiftSheet (view/edit existing shift) ────────────────────────────────
+// ─── EditShiftDialog — edit time, slot, capacity, delete ─────────────────────
 
-function EditShiftSheet({
+function EditShiftDialog({
   open,
   shift,
-  volunteers,
   onClose,
   onRefresh,
+  onManageVolunteers,
 }: {
   open: boolean
   shift: Shift | null
-  volunteers: Volunteer[]
   onClose: () => void
   onRefresh: () => void
+  onManageVolunteers: () => void
 }) {
   const [isPending, startTransition] = useTransition()
-  const [assigningId, setAssigningId] = useState("")
-  const [editingCapacity, setEditingCapacity] = useState(false)
-  const [newCapacity, setNewCapacity] = useState("")
+  const [slot, setSlot] = useState("")
+  const [startTime, setStartTime] = useState("")
+  const [endTime, setEndTime] = useState("")
+  const [capacity, setCapacity] = useState("")
 
   useEffect(() => {
     if (shift) {
-      setNewCapacity(shift.capacity.toString())
-      setEditingCapacity(false)
-      setAssigningId("")
+      setSlot(shift.slot)
+      setStartTime(shift.start_time)
+      setEndTime(shift.end_time)
+      setCapacity(shift.capacity.toString())
     }
   }, [shift])
 
   if (!shift) return null
 
   const assigned = shift.shift_assignments ?? []
-  const unassigned = volunteers.filter((v) => !assigned.some((a) => a.user_id === v.id))
-
   const displayDate = new Date(shift.shift_date + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   })
+
+  const isDirty =
+    slot !== shift.slot ||
+    startTime !== shift.start_time ||
+    endTime !== shift.end_time ||
+    capacity !== shift.capacity.toString()
+
+  const handleSave = () => {
+    const cap = parseInt(capacity)
+    if (!cap || cap < 1) { toast.error("Capacity must be at least 1"); return }
+    if (cap < assigned.length) {
+      toast.error(`Cannot reduce capacity below ${assigned.length} (current assignments)`)
+      return
+    }
+    startTransition(async () => {
+      const res = await updateSingleShift(shift.id, {
+        slot,
+        start_time: startTime,
+        end_time: endTime,
+        capacity: cap,
+      })
+      if (res.success) {
+        toast.success("Shift updated")
+        onRefresh()
+        onClose()
+      } else {
+        toast.error(res.error || "Failed to update")
+      }
+    })
+  }
 
   const handleDelete = () => {
     startTransition(async () => {
@@ -366,23 +396,191 @@ function EditShiftSheet({
     })
   }
 
-  const handleUpdateCapacity = () => {
-    const val = parseInt(newCapacity)
-    if (val < assigned.length) {
-      toast.error(`Cannot reduce below ${assigned.length} (current assignments)`)
-      return
-    }
-    startTransition(async () => {
-      const res = await updateSingleShift(shift.id, { capacity: val })
-      if (res.success) {
-        toast.success("Capacity updated")
-        setEditingCapacity(false)
-        onRefresh()
-      } else {
-        toast.error(res.error || "Failed")
-      }
-    })
-  }
+  const capacityStatus = getCapacityStatus(shift.capacity, assigned.length)
+  const fillPct = shift.capacity > 0 ? Math.min(Math.round((assigned.length / shift.capacity) * 100), 100) : 0
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5 pb-4 border-b">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+            <Pencil className="h-4 w-4 text-muted-foreground" />
+            Edit Shift
+          </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {displayDate}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="px-5 py-4 space-y-5">
+          {/* Current fill status summary */}
+          <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                <span>{assigned.length} of {shift.capacity} spots filled</span>
+              </div>
+              <Badge
+                variant={capacityStatus === "full" ? "destructive" : capacityStatus === "nearly-full" ? "secondary" : "default"}
+                className="text-xs"
+              >
+                {capacityStatus === "full" ? "Full" : capacityStatus === "nearly-full" ? "Nearly Full" : "Available"}
+              </Badge>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className={
+                  capacityStatus === "full" ? "h-full rounded-full bg-red-500"
+                  : capacityStatus === "nearly-full" ? "h-full rounded-full bg-orange-500"
+                  : "h-full rounded-full bg-green-500"
+                }
+                style={{ width: `${fillPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Slot selector */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time Slot</Label>
+            <div className="flex gap-2">
+              {SLOTS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setSlot(s)
+                    setStartTime(SLOT_DEFAULTS[s].start)
+                    setEndTime(SLOT_DEFAULTS[s].end)
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-lg border text-center transition-all text-sm ${
+                    slot === s
+                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-medium">{SLOT_DEFAULTS[s].label}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {fmt12(SLOT_DEFAULTS[s].start)}–{fmt12(SLOT_DEFAULTS[s].end)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom start/end times */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Start Time</Label>
+              <Input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">End Time</Label>
+              <Input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Capacity */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Volunteer Capacity</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={assigned.length || 1}
+                max={50}
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="w-24 h-9 text-sm"
+              />
+              <span className="text-xs text-muted-foreground">max volunteers</span>
+            </div>
+            {parseInt(capacity) < assigned.length && (
+              <p className="text-xs text-destructive">Cannot be less than current assignments ({assigned.length})</p>
+            )}
+          </div>
+
+          {/* Manage volunteers shortcut */}
+          <button
+            onClick={onManageVolunteers}
+            className="w-full flex items-center justify-between rounded-lg border border-dashed px-4 py-3 text-sm hover:bg-muted/40 hover:border-primary/40 transition-colors group"
+          >
+            <div className="flex items-center gap-2 text-muted-foreground group-hover:text-foreground">
+              <Users className="h-4 w-4" />
+              <span>Manage volunteers</span>
+            </div>
+            <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+              {assigned.length}/{shift.capacity}
+            </span>
+          </button>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t flex gap-2 bg-background">
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-9 text-sm px-3"
+            onClick={handleDelete}
+            disabled={isPending}
+          >
+            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1 h-9 text-sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 h-9 text-sm"
+            onClick={handleSave}
+            disabled={isPending || !isDirty}
+          >
+            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+            Save Changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── ManageVolunteersDialog — assign / remove volunteers ──────────────────────
+
+function ManageVolunteersDialog({
+  open,
+  shift,
+  volunteers,
+  onClose,
+  onRefresh,
+}: {
+  open: boolean
+  shift: Shift | null
+  volunteers: Volunteer[]
+  onClose: () => void
+  onRefresh: () => void
+}) {
+  const [isPending, startTransition] = useTransition()
+  const [assigningId, setAssigningId] = useState("")
+
+  useEffect(() => {
+    if (open) setAssigningId("")
+  }, [open])
+
+  if (!shift) return null
+
+  const assigned = shift.shift_assignments ?? []
+  const unassigned = volunteers.filter((v) => !assigned.some((a) => a.user_id === v.id))
+
+  const displayDate = new Date(shift.shift_date + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  })
 
   const handleAssign = () => {
     if (!assigningId) return
@@ -411,137 +609,70 @@ function EditShiftSheet({
   }
 
   const capacityStatus = getCapacityStatus(shift.capacity, assigned.length)
-  const fillPct = shift.capacity > 0 ? Math.min(Math.round((assigned.length / shift.capacity) * 100), 100) : 0
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
-        {/* Header — matches ShiftModal style */}
         <DialogHeader className="px-5 pt-5 pb-4 border-b">
-          <DialogTitle className="text-base font-semibold">
-            {SLOT_DEFAULTS[shift.slot]?.label || shift.slot} Shift
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            Manage Volunteers
           </DialogTitle>
-          <DialogDescription className="sr-only">
-            Edit shift details, manage volunteers, or delete this shift.
+          <DialogDescription className="text-sm text-muted-foreground">
+            {SLOT_DEFAULTS[shift.slot]?.label || shift.slot} — {displayDate} · {fmt12(shift.start_time)}–{fmt12(shift.end_time)}
           </DialogDescription>
-          <p className="text-sm text-muted-foreground">{displayDate}</p>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[70vh]">
-          <div className="px-5 py-4 space-y-5">
-            {/* Date + time block — matches ShiftModal's info block */}
-            <div className="flex flex-col gap-2 rounded-lg border p-3 bg-muted/20">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span>{displayDate}</span>
-                <Badge
-                  variant={
-                    capacityStatus === "available" ? "default"
-                    : capacityStatus === "nearly-full" ? "secondary"
-                    : "destructive"
-                  }
-                  className="ml-auto text-xs"
-                >
-                  {capacityStatus === "available" ? "Available" : capacityStatus === "nearly-full" ? "Nearly Full" : "Full"}
-                </Badge>
+        <ScrollArea className="max-h-[60vh]">
+          <div className="px-5 py-4 space-y-4">
+            {/* Capacity pill */}
+            <div className="flex items-center gap-3">
+              <div className={`px-3 py-1 rounded-full text-sm font-semibold text-white ${
+                capacityStatus === "full" ? "bg-red-500" : capacityStatus === "nearly-full" ? "bg-orange-500" : "bg-green-500"
+              }`}>
+                {assigned.length}/{shift.capacity}
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{fmt12(shift.start_time)} – {fmt12(shift.end_time)} ({shift.slot})</span>
-                </div>
-                <span className="text-muted-foreground text-xs">{assigned.length}/{shift.capacity} filled</span>
-              </div>
+              <span className="text-sm text-muted-foreground">
+                {shift.capacity - assigned.length > 0
+                  ? `${shift.capacity - assigned.length} spot${shift.capacity - assigned.length !== 1 ? "s" : ""} open`
+                  : "At capacity"}
+              </span>
             </div>
 
-            {/* Capacity bar + inline edit */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" /> Capacity
-                </span>
-                {!editingCapacity && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs px-2"
-                    onClick={() => { setNewCapacity(shift.capacity.toString()); setEditingCapacity(true) }}
-                  >
-                    Edit
-                  </Button>
-                )}
-              </div>
-              {editingCapacity ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={newCapacity}
-                    onChange={(e) => setNewCapacity(e.target.value)}
-                    className="w-20 h-8 text-sm"
-                  />
-                  <Button size="sm" className="h-8 text-xs" onClick={handleUpdateCapacity} disabled={isPending}>Save</Button>
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setEditingCapacity(false)}>Cancel</Button>
-                </div>
+            {/* Assigned volunteers */}
+            <div className="space-y-1">
+              {assigned.length === 0 ? (
+                <p className="text-center py-6 text-sm text-muted-foreground italic">No volunteers assigned yet</p>
               ) : (
-                <div className="space-y-1.5">
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={
-                        capacityStatus === "full" ? "h-full bg-primary rounded-full"
-                        : capacityStatus === "nearly-full" ? "h-full bg-amber-500 rounded-full"
-                        : "h-full bg-primary/50 rounded-full"
-                      }
-                      style={{ width: `${fillPct}%` }}
-                    />
+                assigned.map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-muted/30 group">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                      {(a.profiles?.name || "?")[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{a.profiles?.name ?? "Unknown"}</p>
+                      <p className="text-xs text-muted-foreground truncate">{a.profiles?.email ?? ""}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 shrink-0"
+                      onClick={() => handleRemove(a.id, a.profiles?.name ?? "Volunteer")}
+                      disabled={isPending}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">{assigned.length} of {shift.capacity} spots filled</p>
-                </div>
+                ))
               )}
-            </div>
-
-            {/* Volunteers list — matches ShiftModal's volunteer section */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Volunteers ({assigned.length})
-              </p>
-              <div className="rounded-lg border bg-card shadow-sm">
-                <div className="p-3 space-y-1.5 max-h-[180px] overflow-y-auto">
-                  {assigned.length === 0 ? (
-                    <p className="text-center py-3 text-sm text-muted-foreground italic">No volunteers assigned yet</p>
-                  ) : (
-                    assigned.map((a) => (
-                      <div key={a.id} className="flex items-center gap-3 text-sm group">
-                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
-                          {(a.profiles?.name || "?")[0].toUpperCase()}
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="font-medium truncate">{a.profiles?.name ?? "Unknown"}</span>
-                          <span className="text-xs text-muted-foreground truncate">{a.profiles?.email ?? ""}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:text-destructive shrink-0"
-                          onClick={() => handleRemove(a.id, a.profiles?.name ?? "Volunteer")}
-                          disabled={isPending}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Add volunteer */}
             {assigned.length < shift.capacity && unassigned.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <div className="space-y-2 pt-1">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                   <UserPlus className="h-3.5 w-3.5" /> Add Volunteer
-                </p>
+                </Label>
                 <div className="flex gap-2">
                   <Select value={assigningId} onValueChange={setAssigningId}>
                     <SelectTrigger className="flex-1 h-9 text-sm">
@@ -556,7 +687,7 @@ function EditShiftSheet({
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button onClick={handleAssign} disabled={!assigningId || isPending} className="h-9 text-sm px-4">
+                  <Button onClick={handleAssign} disabled={!assigningId || isPending} className="h-9 px-4 text-sm">
                     {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Add"}
                   </Button>
                 </div>
@@ -566,26 +697,15 @@ function EditShiftSheet({
             {assigned.length >= shift.capacity && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-sm">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>Shift is at full capacity</span>
+                <span>Shift is at full capacity — remove a volunteer to add another</span>
               </div>
             )}
           </div>
         </ScrollArea>
 
-        {/* Footer — delete + close */}
-        <div className="px-5 py-3 border-t flex gap-2 bg-background">
-          <Button variant="outline" size="sm" className="flex-1 h-9 text-sm" onClick={onClose}>
-            Close
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="flex-1 h-9 text-sm"
-            onClick={handleDelete}
-            disabled={isPending}
-          >
-            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
-            Delete{assigned.length > 0 ? ` (${assigned.length})` : ""}
+        <div className="px-5 py-3 border-t bg-background">
+          <Button variant="outline" className="w-full h-9 text-sm" onClick={onClose}>
+            Done
           </Button>
         </div>
       </DialogContent>
@@ -992,7 +1112,8 @@ function CalendarTab() {
   const [shifts, setShifts] = useState<Shift[]>([])
   const [loading, setLoading] = useState(true)
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
-  const [selectedShift, setSelectedShift] = useState<Shift | null>(null)
+  const [editShift, setEditShift] = useState<Shift | null>(null)
+  const [manageShift, setManageShift] = useState<Shift | null>(null)
   const [addDialogDate, setAddDialogDate] = useState<string | null>(null)
 
   const monthName = useMemo(
@@ -1047,21 +1168,21 @@ function CalendarTab() {
   }
 
   const handleShiftClick = (shift: Shift | null, _slot: string, _dateStr: string) => {
-    if (shift) {
-      setSelectedShift(shift)
-    }
+    if (shift) setEditShift(shift)
   }
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     await loadMonthData()
-    // Update selected shift if still selected
-    if (selectedShift) {
-      const updatedShift = shifts.find((s) => s.id === selectedShift.id)
-      if (updatedShift) {
-        setSelectedShift(updatedShift)
-      }
+    // Keep the latest data in any open dialog
+    if (editShift) {
+      const updated = shifts.find((s) => s.id === editShift.id)
+      if (updated) setEditShift(updated)
     }
-  }
+    if (manageShift) {
+      const updated = shifts.find((s) => s.id === manageShift.id)
+      if (updated) setManageShift(updated)
+    }
+  }, [loadMonthData, editShift, manageShift, shifts])
 
   return (
     <>
@@ -1127,16 +1248,28 @@ function CalendarTab() {
         )}
       </div>
 
-      {/* Edit shift sheet */}
-      <EditShiftSheet
-        open={!!selectedShift}
-        shift={selectedShift}
+      {/* Edit Shift — change times, slot, capacity, or delete */}
+      <EditShiftDialog
+        open={!!editShift}
+        shift={editShift}
+        onClose={() => setEditShift(null)}
+        onRefresh={handleRefresh}
+        onManageVolunteers={() => {
+          setManageShift(editShift)
+          setEditShift(null)
+        }}
+      />
+
+      {/* Manage Volunteers — assign / remove */}
+      <ManageVolunteersDialog
+        open={!!manageShift}
+        shift={manageShift}
         volunteers={volunteers}
-        onClose={() => setSelectedShift(null)}
+        onClose={() => setManageShift(null)}
         onRefresh={handleRefresh}
       />
 
-      {/* Add shift dialog */}
+      {/* Add Shift — create single or recurring shifts */}
       <AddShiftDialog
         open={!!addDialogDate}
         initialDate={addDialogDate || ""}
