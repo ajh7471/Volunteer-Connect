@@ -77,8 +77,11 @@ function fmt12(time: string) {
 }
 
 function getCapacityStatus(capacity: number, assigned: number): "available" | "nearly-full" | "full" {
-  if (assigned >= capacity) return "full"
-  if (assigned >= capacity * 0.75) return "nearly-full"
+  const cap = capacity || 0
+  const count = assigned || 0
+  if (cap === 0) return "available"
+  if (count >= cap) return "full"
+  if (count / cap >= 0.75) return "nearly-full"
   return "available"
 }
 
@@ -155,19 +158,16 @@ function AdminShiftIndicator({
   assignmentsCount: number
   onClick: () => void
 }) {
-  const status = getCapacityStatus(capacity, assignmentsCount)
+  const count = assignmentsCount ?? 0
+  const cap = capacity ?? 0
+  const status = getCapacityStatus(cap, count)
 
-  const bgColor = {
-    available: "bg-green-500",
-    "nearly-full": "bg-orange-500",
-    full: "bg-red-500",
-  }[status]
-
-  const slotLabel = {
-    AM: "AM",
-    MID: "MID",
-    PM: "PM",
-  }[slot] || slot
+  const bgClass =
+    status === "full"
+      ? "bg-red-500 hover:bg-red-600"
+      : status === "nearly-full"
+        ? "bg-orange-500 hover:bg-orange-600"
+        : "bg-green-500 hover:bg-green-600"
 
   return (
     <button
@@ -175,14 +175,15 @@ function AdminShiftIndicator({
         e.stopPropagation()
         onClick()
       }}
-      className={`w-full ${bgColor} text-white text-xs rounded px-1.5 py-1 cursor-pointer hover:opacity-90 transition-opacity text-left`}
+      className={`w-full ${bgClass} text-white text-xs rounded px-1.5 py-1 cursor-pointer transition-colors text-left`}
+      title={`${slot}: ${count}/${cap} — ${status === "full" ? "Full" : status === "nearly-full" ? "Nearly Full" : "Available"}`}
     >
-      <div className="flex items-center justify-between gap-1">
-        <span className="font-medium truncate">{slotLabel}</span>
-        <span className="text-[10px] opacity-90 tabular-nums shrink-0">{assignmentsCount}/{capacity}</span>
+      <div className="flex items-center justify-between gap-1 leading-tight">
+        <span className="font-semibold">{slot}</span>
+        <span className="tabular-nums font-bold text-[10px]">{count}/{cap}</span>
       </div>
-      <div className="text-[10px] opacity-80 truncate">
-        {fmt12(startTime)} - {fmt12(endTime)}
+      <div className="text-[10px] opacity-85 truncate leading-tight">
+        {fmt12(startTime)}–{fmt12(endTime)}
       </div>
     </button>
   )
@@ -241,7 +242,7 @@ function AdminDayCell({
             startTime={amShift.start_time}
             endTime={amShift.end_time}
             capacity={amShift.capacity}
-            assignmentsCount={amShift.shift_assignments.length}
+            assignmentsCount={(amShift.shift_assignments ?? []).length}
             onClick={() => onShiftClick(amShift, "AM", dateStr)}
           />
         )}
@@ -251,7 +252,7 @@ function AdminDayCell({
             startTime={midShift.start_time}
             endTime={midShift.end_time}
             capacity={midShift.capacity}
-            assignmentsCount={midShift.shift_assignments.length}
+            assignmentsCount={(midShift.shift_assignments ?? []).length}
             onClick={() => onShiftClick(midShift, "MID", dateStr)}
           />
         )}
@@ -261,21 +262,9 @@ function AdminDayCell({
             startTime={pmShift.start_time}
             endTime={pmShift.end_time}
             capacity={pmShift.capacity}
-            assignmentsCount={pmShift.shift_assignments.length}
+            assignmentsCount={(pmShift.shift_assignments ?? []).length}
             onClick={() => onShiftClick(pmShift, "PM", dateStr)}
           />
-        )}
-        {/* Show + button if day has no shifts and not past */}
-        {!isPastDay && !amShift && !midShift && !pmShift && isCurrentMonth && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onDayClick(date)
-            }}
-            className="w-full text-muted-foreground/40 hover:text-primary/60 transition-colors flex items-center justify-center py-2"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
         )}
       </div>
     </div>
@@ -1104,20 +1093,22 @@ function CalendarTab() {
         </Card>
 
         {/* Legend */}
-        <Card>
-          <CardContent className="flex flex-wrap gap-x-4 gap-y-2 py-3 px-4">
-            {[
-              { color: "bg-green-500", label: "Available" },
-              { color: "bg-orange-500", label: "Nearly Full" },
-              { color: "bg-red-500", label: "Full" },
-            ].map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <div className={`h-3 w-6 rounded-sm ${color}`} />
-                <span className="text-xs text-muted-foreground">{label}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
+          {[
+            { color: "bg-green-500", label: "Open", detail: "spots available" },
+            { color: "bg-orange-500", label: "Nearly Full", detail: "≥75% filled" },
+            { color: "bg-red-500", label: "Full", detail: "at capacity" },
+          ].map(({ color, label, detail }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className={`h-3 w-5 rounded-sm ${color} shrink-0`} />
+              <span className="text-xs font-medium">{label}</span>
+              <span className="text-xs text-muted-foreground hidden sm:inline">— {detail}</span>
+            </div>
+          ))}
+          <span className="text-xs text-muted-foreground ml-auto hidden sm:block">
+            Each block shows <span className="font-mono font-semibold">filled/capacity</span>
+          </span>
+        </div>
 
         {/* Calendar grid */}
         {loading ? (
