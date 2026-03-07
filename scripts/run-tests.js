@@ -1,6 +1,6 @@
 import { execSync } from "child_process"
 
-function run(cmd: string, opts: object = {}) {
+function run(cmd, opts = {}) {
   console.log("\n> " + cmd)
   execSync(cmd, { stdio: "inherit", ...opts })
 }
