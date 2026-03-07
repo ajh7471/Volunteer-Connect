@@ -80,24 +80,15 @@ export default function VolunteerProfilePage() {
   }
 
   async function loadAssignments() {
-    try {
-      const { data, error } = await supabase
-        .from("shift_assignments")
-        .select("id, shift:shifts(shift_date, slot)")
-        .eq("user_id", id)
-        .order("id", { ascending: false })
-        .limit(10)
+    const { data } = await supabase
+      .from("shift_assignments")
+      .select("id, shift:shifts(shift_date, slot)")
+      .eq("user_id", id)
+      .order("id", { ascending: false })
+      .limit(10)
 
-      if (error) {
-        console.error("[v0] Failed to load assignments:", error.message)
-        return
-      }
-
-      if (data) {
-        setAssignments(data as any)
-      }
-    } catch (err) {
-      console.error("[v0] Network error loading assignments:", err)
+    if (data) {
+      setAssignments(data as any)
     }
   }
 
@@ -115,20 +106,15 @@ export default function VolunteerProfilePage() {
     setLoading(true)
     setError(null)
 
-    try {
-      const { error: updateError } = await supabase.from("profiles").update({ name, phone, role }).eq("id", id)
+    const { error: updateError } = await supabase.from("profiles").update({ name, phone, role }).eq("id", id)
 
-      if (updateError) {
-        setError(updateError.message)
-        ToastManager.error("Failed to update profile")
-      } else {
-        ToastManager.success("Profile updated successfully")
-        setEditing(false)
-        loadProfile()
-      }
-    } catch (err) {
-      console.error("[v0] Network error saving profile:", err)
-      ToastManager.error("Network error. Please try again.")
+    if (updateError) {
+      setError(updateError.message)
+      ToastManager.error("Failed to update profile")
+    } else {
+      ToastManager.success("Profile updated successfully")
+      setEditing(false)
+      loadProfile()
     }
     setLoading(false)
   }
@@ -136,18 +122,13 @@ export default function VolunteerProfilePage() {
   async function handleDeactivate() {
     setDeactivating(true)
 
-    try {
-      const { error: updateError } = await supabase.from("profiles").update({ active: false }).eq("id", id)
+    const { error: updateError } = await supabase.from("profiles").update({ active: false }).eq("id", id)
 
-      if (updateError) {
-        ToastManager.error("Failed to deactivate account")
-      } else {
-        ToastManager.success("Account deactivated successfully")
-        router.push("/admin/volunteers")
-      }
-    } catch (err) {
-      console.error("[v0] Network error deactivating:", err)
-      ToastManager.error("Network error. Please try again.")
+    if (updateError) {
+      ToastManager.error("Failed to deactivate account")
+    } else {
+      ToastManager.success("Account deactivated successfully")
+      router.push("/admin/volunteers")
     }
     setDeactivating(false)
   }
@@ -155,18 +136,13 @@ export default function VolunteerProfilePage() {
   async function handleReactivate() {
     setLoading(true)
 
-    try {
-      const { error: updateError } = await supabase.from("profiles").update({ active: true }).eq("id", id)
+    const { error: updateError } = await supabase.from("profiles").update({ active: true }).eq("id", id)
 
-      if (updateError) {
-        ToastManager.error("Failed to reactivate account")
-      } else {
-        ToastManager.success("Account reactivated successfully")
-        loadProfile()
-      }
-    } catch (err) {
-      console.error("[v0] Network error reactivating:", err)
-      ToastManager.error("Network error. Please try again.")
+    if (updateError) {
+      ToastManager.error("Failed to reactivate account")
+    } else {
+      ToastManager.success("Account reactivated successfully")
+      loadProfile()
     }
     setLoading(false)
   }
