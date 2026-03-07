@@ -5,8 +5,20 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    // Provide stub env vars so any transitive import of lib/supabase/config
+    // (before mocks are applied) doesn't throw at module evaluation time.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0In0.stub",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-stub-key",
+      SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0In0.stub",
+    },
+    // Reset modules between test files so the config singleton cache is cleared
+    isolate: true,
+    setupFiles: ["./__tests__/setup.ts"],
     include: ["**/__tests__/**/*.{test,spec}.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"],
-    exclude: ["node_modules", ".next", "dist"],
+    exclude: ["node_modules", ".next", "dist", "scripts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
