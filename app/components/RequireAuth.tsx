@@ -51,9 +51,14 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         return true
       }
 
-      // Use getSession() first - it reads from local storage without network request
-      // This prevents hanging in WebKit iframe sandboxes and is much faster
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      // Create a timeout promise that rejects after 4 seconds
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Auth check timeout")), 4000)
+      )
+
+      // Race the session check against the timeout
+      const sessionPromise = supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise])
 
       if (sessionError) {
         console.warn("[v0] RequireAuth session error:", sessionError.message)
@@ -70,10 +75,10 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
       setAuthCache(session.user, true)
       return true
     } catch (error) {
-      console.error("[v0] RequireAuth error:", error)
-      // Retry on unexpected errors
-      if (retryCount < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
+      console.error("[v0] RequireAuth error:", error instanceof Error ? error.message : String(error))
+      // Don't retry on timeouts, just fail fast
+      if (retryCount === 0 && !(error instanceof Error && error.message === "Auth check timeout")) {
+        await new Promise((resolve) => setTimeout(resolve, 300))
         return checkAuth(retryCount + 1)
       }
       return false
@@ -85,10 +90,10 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
 
     const timeout = setTimeout(() => {
       if (mounted && !authCheckCompleted.current) {
-        console.warn("[v0] RequireAuth timeout - auth check did not complete in 8s")
+        console.warn("[v0] RequireAuth timeout - auth check did not complete in 5s")
         setTimedOut(true)
       }
-    }, 8000)
+    }, 5000)
 
     const performAuthCheck = async () => {
       // Quick check from cache first
