@@ -72,24 +72,28 @@ function validateEnvironmentVariables(): SupabaseConfig {
   }
 }
 
-// Cache the validated config to avoid repeated validation
+// Cache both success and failure to avoid re-validating on every request
 let cachedConfig: SupabaseConfig | null = null
+let validationAttempted = false
 
 /**
- * Gets the validated Supabase configuration
- * Caches the result to avoid repeated validation
+ * Gets the validated Supabase configuration.
+ * Caches the result (or failure) to avoid repeated validation on every request.
  */
 export function getSupabaseConfig(): SupabaseConfig {
-  if (!cachedConfig) {
+  if (!validationAttempted) {
+    validationAttempted = true
     try {
       cachedConfig = validateEnvironmentVariables()
     } catch (error) {
-      // In development, log detailed error
-      if (process.env.NODE_ENV === "development") {
-        console.error("[Supabase Config Error]", error)
-      }
+      cachedConfig = null
       throw error
     }
+  }
+  if (!cachedConfig) {
+    throw new SupabaseConfigError(
+      "Missing required Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    )
   }
   return cachedConfig
 }
@@ -114,21 +118,18 @@ export function isSupabaseConfigured(): boolean {
 export function getSupabaseConfigSafe(): SupabaseConfig | null {
   try {
     return getSupabaseConfig()
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn(
-        "[Supabase Config] Configuration unavailable:",
-        error instanceof Error ? error.message : "Unknown error",
-      )
-    }
+  } catch {
+    // Silently return null — callers are responsible for handling missing config.
+    // The middleware will gracefully degrade rather than hard-crash the request.
     return null
   }
 }
 
 /**
- * Resets the cached configuration
- * Useful for testing or when environment variables change
+ * Resets the cached configuration.
+ * Useful for testing or when environment variables change at runtime.
  */
 export function resetSupabaseConfig(): void {
   cachedConfig = null
+  validationAttempted = false
 }

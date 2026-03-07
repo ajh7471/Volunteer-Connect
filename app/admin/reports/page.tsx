@@ -1,13 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
 import { useSessionRole } from "@/lib/useSession"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Users, TrendingUp, Download, FileText, BarChart, Clock, ArrowRight } from 'lucide-react'
+import { Calendar, Users, TrendingUp, Download, FileText, ArrowRight } from 'lucide-react'
 import {
   getDashboardStats,
   getShiftStatistics,
@@ -19,6 +18,32 @@ import {
   type ShiftStatistics,
 } from "../reporting-actions"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
+
+type Period = "this_week" | "next_week" | "2_weeks" | "this_month" | "next_month" | "last_30"
+
+const PERIOD_LABELS: { value: Period; label: string }[] = [
+  { value: "this_week",  label: "This Week" },
+  { value: "next_week",  label: "Next Week" },
+  { value: "2_weeks",    label: "2 Weeks" },
+  { value: "this_month", label: "This Month" },
+  { value: "next_month", label: "Next Month" },
+  { value: "last_30",    label: "Last 30d" },
+]
+
+function getPeriodDates(period: Period): { start: string; end: string } {
+  const today = new Date(); today.setHours(0,0,0,0)
+  const fmt = (d: Date) => d.toISOString().split("T")[0]
+  const sow = (d: Date) => { const c = new Date(d); c.setDate(c.getDate() - c.getDay()); return c }
+  switch (period) {
+    case "this_week":  { const s = sow(today); const e = new Date(s); e.setDate(s.getDate()+6); return { start: fmt(s), end: fmt(e) } }
+    case "next_week":  { const s = sow(today); s.setDate(s.getDate()+7); const e = new Date(s); e.setDate(s.getDate()+6); return { start: fmt(s), end: fmt(e) } }
+    case "2_weeks":    { const e = new Date(today); e.setDate(today.getDate()+13); return { start: fmt(today), end: fmt(e) } }
+    case "this_month": { const s = new Date(today.getFullYear(),today.getMonth(),1); const e = new Date(today.getFullYear(),today.getMonth()+1,0); return { start: fmt(s), end: fmt(e) } }
+    case "next_month": { const s = new Date(today.getFullYear(),today.getMonth()+1,1); const e = new Date(today.getFullYear(),today.getMonth()+2,0); return { start: fmt(s), end: fmt(e) } }
+    default:           { const s = new Date(today); s.setDate(today.getDate()-30); return { start: fmt(s), end: fmt(today) } }
+  }
+}
 
 type PopularSlot = {
   slot: string
@@ -45,6 +70,21 @@ export default function ReportsPage() {
   const [popularSlots, setPopularSlots] = useState<PopularSlot[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [fillPeriod, setFillPeriod] = useState<Period>("2_weeks")
+  const [fillLoading, setFillLoading] = useState(false)
+
+  const loadFillStats = useCallback(async (period: Period) => {
+    setFillLoading(true)
+    const { start, end } = getPeriodDates(period)
+    const res = await getShiftStatistics(start, end)
+    if (res.success) setShiftStats(res.data || null)
+    setFillLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadFillStats(fillPeriod)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fillPeriod])
 
   useEffect(() => {
     if (isAdmin === true) {
@@ -67,19 +107,14 @@ export default function ReportsPage() {
       // Load all data in parallel with error handling
       const results = await Promise.allSettled([
         getDashboardStats(),
-        getShiftStatistics(startDate, endDate),
         getPopularTimeSlots(),
         getRecentActivity(10),
       ])
 
-      const [statsRes, shiftStatsRes, slotsRes, activityRes] = results
+      const [statsRes, slotsRes, activityRes] = results
 
       if (statsRes.status === "fulfilled" && statsRes.value.success) {
         setDashboardStats(statsRes.value.data)
-      }
-
-      if (shiftStatsRes.status === "fulfilled" && shiftStatsRes.value.success) {
-        setShiftStats(shiftStatsRes.value.data || null)
       }
 
       if (slotsRes.status === "fulfilled" && slotsRes.value.success) {
@@ -183,210 +218,161 @@ export default function ReportsPage() {
   return (
     <RequireAuth>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Reports & Analytics</h1>
-            <p className="text-muted-foreground">Volunteer activity and shift statistics</p>
-          </div>
-          <Button variant="outline" asChild>
-            <Link href="/admin">Back to Dashboard</Link>
-          </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Reports & Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Volunteer activity and shift statistics</p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Inline stat strip — always visible, no popup required */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { icon: Users,      label: "Volunteers",     value: dashboardStats?.totalVolunteers ?? "—" },
+            { icon: Calendar,   label: "Total Shifts",   value: dashboardStats?.totalShifts ?? "—" },
+            { icon: FileText,   label: "Assignments",    value: dashboardStats?.totalAssignments ?? "—" },
+            { icon: TrendingUp, label: "Active / Month", value: dashboardStats?.activeThisMonth ?? "—" },
+          ].map(({ icon: Icon, label, value }) => (
+            <div key={label} className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 flex items-center gap-3">
+              <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-lg font-bold leading-none">{value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Shift fill + popular slots side by side */}
+        <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Volunteers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Shift Fill Rates</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dashboardStats?.totalVolunteers || 0}</div>
+            <CardContent className="space-y-3">
+              {/* Period chips */}
+              <div className="flex flex-wrap gap-1">
+                {PERIOD_LABELS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setFillPeriod(value)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full border text-xs font-medium transition-all",
+                      fillPeriod === value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:border-primary/50"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {fillLoading ? (
+                <p className="text-xs text-muted-foreground py-2">Loading…</p>
+              ) : shiftStats ? (
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-muted-foreground">Avg. fill rate</span>
+                    <span className="text-2xl font-bold">{shiftStats.avg_fill_rate}%</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-md bg-green-50 dark:bg-green-950/30 p-2">
+                      <p className="text-base font-bold text-green-700 dark:text-green-300">{shiftStats.full_shifts}</p>
+                      <p className="text-xs text-muted-foreground">Full</p>
+                    </div>
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 p-2">
+                      <p className="text-base font-bold text-amber-700 dark:text-amber-300">{shiftStats.partial_shifts}</p>
+                      <p className="text-xs text-muted-foreground">Partial</p>
+                    </div>
+                    <div className="rounded-md bg-muted/40 p-2">
+                      <p className="text-base font-bold">{shiftStats.empty_shifts}</p>
+                      <p className="text-xs text-muted-foreground">Empty</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="w-full justify-between text-xs" asChild>
+                    <Link href="/admin/reports/shift-analytics">
+                      View full analytics <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No shift data available</p>
+              )}
             </CardContent>
           </Card>
+
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Shifts</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Popular Time Slots</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{dashboardStats?.totalShifts || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Assignments</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dashboardStats?.totalAssignments || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active This Month</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dashboardStats?.activeThisMonth || 0}</div>
+              {popularSlots.length > 0 ? (
+                <div className="divide-y">
+                  {popularSlots.map((s: PopularSlot, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                      <div>
+                        <p className="text-sm font-medium">{s.slot}</p>
+                        <p className="text-xs text-muted-foreground">{s.total_shifts} shifts · {s.total_volunteers} vol.</p>
+                      </div>
+                      <span className="text-sm font-bold tabular-nums">{s.avg_fill_rate}%</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No data available</p>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/admin/reports/attendance")}>
-            <CardHeader>
-              <Clock className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Attendance Report</CardTitle>
-              <CardDescription>Track volunteer hours and shift attendance history</CardDescription>
+        {/* Recent activity + exports side by side */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold">Recent Sign-ups</CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                  <Link href="/admin/reports/attendance">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <Button variant="ghost" className="w-full justify-between">
-                View Report
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              {recentActivity.length > 0 ? (
+                <div className="divide-y">
+                  {recentActivity.map((activity: RecentActivity) => (
+                    <div key={activity.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{activity.volunteer_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(activity.shift_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {activity.slot}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground whitespace-nowrap ml-3">{formatTimeAgo(activity.created_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No recent activity</p>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/admin/reports/shift-analytics")}>
-            <CardHeader>
-              <BarChart className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Shift Analytics</CardTitle>
-              <CardDescription>Analyze shift fill rates and capacity utilization</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" className="w-full justify-between">
-                View Analytics
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <Download className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Quick Exports</CardTitle>
-              <CardDescription>Download data in CSV format</CardDescription>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Exports</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" size="sm" onClick={handleExportVolunteers} className="w-full">
-                Export Volunteers
+              <Button variant="outline" size="sm" onClick={handleExportVolunteers} className="w-full justify-start gap-2 text-sm">
+                <Download className="h-3.5 w-3.5" /> Volunteers CSV
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExportShiftReport} className="w-full">
-                Export Shifts
+              <Button variant="outline" size="sm" onClick={handleExportShiftReport} className="w-full justify-start gap-2 text-sm">
+                <Download className="h-3.5 w-3.5" /> Shifts CSV
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExportAttendance} className="w-full">
-                Export Attendance
+              <Button variant="outline" size="sm" onClick={handleExportAttendance} className="w-full justify-start gap-2 text-sm">
+                <Download className="h-3.5 w-3.5" /> Attendance CSV
               </Button>
             </CardContent>
           </Card>
         </div>
-
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              {/* Shift Statistics */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Shift Fill Rates (Last 30 Days)</CardTitle>
-                  <CardDescription>Overall capacity utilization</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {shiftStats ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Average Fill Rate</span>
-                        <span className="text-2xl font-bold">{shiftStats.avg_fill_rate}%</span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Full Shifts</span>
-                          <span className="font-medium">{shiftStats.full_shifts}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Partial Shifts</span>
-                          <span className="font-medium">{shiftStats.partial_shifts}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Empty Shifts</span>
-                          <span className="font-medium">{shiftStats.empty_shifts}</span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No shift data available</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Popular Time Slots */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Popular Time Slots</CardTitle>
-                  <CardDescription>Most requested shift times</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {popularSlots.length > 0 ? (
-                    <div className="space-y-3">
-                      {popularSlots.map((slot: PopularSlot, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{slot.slot}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {slot.total_shifts} shifts, {slot.total_volunteers} volunteers
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold">{slot.avg_fill_rate}%</p>
-                            <p className="text-xs text-muted-foreground">fill rate</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No data available</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Activity Tab */}
-          <TabsContent value="activity" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest volunteer sign-ups</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recentActivity.length > 0 ? (
-                  <div className="space-y-3">
-                    {recentActivity.map((activity: RecentActivity) => (
-                      <div key={activity.id} className="flex items-start justify-between border-b pb-3 last:border-0">
-                        <div>
-                          <p className="font-medium">{activity.volunteer_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Signed up for {new Date(activity.shift_date).toLocaleDateString()} - {activity.slot}
-                          </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{formatTimeAgo(activity.created_at)}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No recent activity</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
       </div>
     </RequireAuth>
   )

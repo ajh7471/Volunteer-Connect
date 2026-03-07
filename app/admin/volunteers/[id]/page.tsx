@@ -175,15 +175,13 @@ export default function VolunteerProfilePage() {
       <div className="space-y-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               {profile.name || "Unnamed"}
               {profile.active === false && (
-                <Badge variant="destructive" className="ml-3">
-                  Inactive
-                </Badge>
+                <Badge variant="destructive" className="text-xs">Inactive</Badge>
               )}
             </h1>
-            <p className="text-muted-foreground">Volunteer Profile</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Volunteer Profile</p>
           </div>
           <Button variant="outline" onClick={() => router.push("/admin/volunteers")}>
             Back to List
@@ -197,16 +195,16 @@ export default function VolunteerProfilePage() {
         )}
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle>Profile Information</CardTitle>
+              <CardTitle className="text-sm font-semibold">Profile Information</CardTitle>
               {!editing && (
-                <Button onClick={() => setEditing(true)} size="sm">
+                <Button onClick={() => setEditing(true)} size="sm" className="h-7 text-xs">
                   Edit
                 </Button>
               )}
             </div>
-            <CardDescription>Joined {new Date(profile.created_at).toLocaleDateString()}</CardDescription>
+            <CardDescription className="text-xs">Joined {new Date(profile.created_at).toLocaleDateString()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {editing ? (
@@ -306,9 +304,9 @@ export default function VolunteerProfilePage() {
         </Card>
 
         <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Danger Zone</CardTitle>
-            <CardDescription>Irreversible actions that affect this volunteer account</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-destructive">Danger Zone</CardTitle>
+            <CardDescription className="text-xs">Irreversible actions that affect this volunteer account</CardDescription>
           </CardHeader>
           <CardContent>
             {profile.active === false ? (
@@ -322,19 +320,19 @@ export default function VolunteerProfilePage() {
                     Deactivate Account
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="sm:max-w-md">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will deactivate the volunteer account. They will no longer be able to log in or sign up for
-                      shifts. Historical data will be preserved. You can reactivate the account later if needed.
+                    <AlertDialogTitle className="text-base font-semibold">Deactivate account?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm text-muted-foreground">
+                      This volunteer will no longer be able to log in or sign up for shifts. Historical data is
+                      preserved and the account can be reactivated later.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel className="h-9 text-sm">Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDeactivate}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      className="h-9 text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       Deactivate
                     </AlertDialogAction>
@@ -346,9 +344,9 @@ export default function VolunteerProfilePage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Shift Assignments</CardTitle>
-            <CardDescription>Last 10 shifts assigned to this volunteer</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold">Recent Shift Assignments</CardTitle>
+            <CardDescription className="text-xs">Last 10 shifts assigned to this volunteer</CardDescription>
           </CardHeader>
           <CardContent>
             {assignments.length === 0 ? (
