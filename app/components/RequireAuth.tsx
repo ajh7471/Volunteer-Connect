@@ -51,26 +51,23 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         return true
       }
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      // Use getSession() first - it reads from local storage without network request
+      // This prevents hanging in WebKit iframe sandboxes and is much faster
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-      if (userError) {
-        console.warn("[v0] RequireAuth auth error:", userError.message)
-        // Retry on network errors
-        if (retryCount < 2 && userError.message.includes("network")) {
-          await new Promise((resolve) => setTimeout(resolve, 500))
-          return checkAuth(retryCount + 1)
-        }
+      if (sessionError) {
+        console.warn("[v0] RequireAuth session error:", sessionError.message)
         setAuthCache(null, false)
         return false
       }
 
-      if (!user) {
+      if (!session?.user) {
         setAuthCache(null, false)
         return false
       }
 
-      // Cache successful auth
-      setAuthCache(user, true)
+      // Cache successful auth from session
+      setAuthCache(session.user, true)
       return true
     } catch (error) {
       console.error("[v0] RequireAuth error:", error)
