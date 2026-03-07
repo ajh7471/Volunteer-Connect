@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from 'next/navigation'
 import RequireAuth from "@/app/components/RequireAuth"
+import { useSession } from "@/lib/session/session-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,6 +33,9 @@ type Profile = {
 
 export default function ProfilePage() {
   const router = useRouter()
+  const { state: sessionState, isLoading: sessionLoading } = useSession()
+  const userId = sessionState.userId
+
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -50,19 +54,23 @@ export default function ProfilePage() {
   const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false)
 
   useEffect(() => {
-    loadProfile()
-  }, [])
+    if (!sessionLoading) {
+      loadProfile()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLoading, userId])
 
   async function loadProfile() {
-    const { data: sessionData } = await supabase.auth.getSession()
-    if (!sessionData.session?.user) {
+    if (!userId) {
       router.push("/auth/login")
       return
     }
 
-    setEmail(sessionData.session.user.email || "")
+    // Fetch email from Supabase auth (lightweight, no network round-trip for userId)
+    const { data: { user } } = await supabase.auth.getUser()
+    setEmail(user?.email || "")
 
-    const { data, error } = await supabase.from("profiles").select("*").eq("id", sessionData.session.user.id).single()
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
 
       if (error || !data) {
         toast.error("Failed to load profile")

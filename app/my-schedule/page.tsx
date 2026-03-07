@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import RequireAuth from "@/app/components/RequireAuth"
+import { useSession } from "@/lib/session/session-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -44,28 +45,28 @@ type TeamMember = {
 }
 
 export default function MySchedulePage() {
+  const { state: sessionState, isLoading: sessionLoading } = useSession()
+  const userId = sessionState.userId
+
   const [upcoming, setUpcoming] = useState<Assignment[]>([])
   const [past, setPast] = useState<Assignment[]>([])
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState<string | null>(null)
   const [shiftTeamMembers, setShiftTeamMembers] = useState<Record<string, TeamMember[]>>({})
   const [loadingTeamMembers, setLoadingTeamMembers] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    loadAssignments()
-  }, [])
+    if (!sessionLoading) {
+      loadAssignments()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLoading, userId])
 
   async function loadAssignments() {
-    const { data: sessionData } = await supabase.auth.getSession()
-    const uid = sessionData.session?.user?.id
-
-    if (!uid) {
+    if (!userId) {
       setLoading(false)
       return
     }
-
-    setUserId(uid)
 
     // Get upcoming assignments and waitlist in parallel
     const today = ymd(new Date())

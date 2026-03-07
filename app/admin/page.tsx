@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
@@ -8,117 +8,37 @@ import RequireAuth from "@/app/components/RequireAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, Calendar, FileText, Settings, UserCog, Mail } from "lucide-react"
+import { useSessionRole } from "@/lib/useSession"
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const { role, loading: roleLoading } = useSessionRole()
+  const isAdmin = roleLoading ? null : role === "admin"
   const [stats, setStats] = useState({ volunteers: 0, shifts: 0, assignments: 0 })
-  const [error, setError] = useState<string | null>(null)
-  const adminCheckCompleted = useRef(false)
 
   useEffect(() => {
-    let mounted = true
-
-    const loadTimeout = setTimeout(() => {
-      if (mounted && !adminCheckCompleted.current) {
-        console.warn("[v0] Admin check timeout - check did not complete")
-        setError("Session timeout. Please try refreshing the page.")
-        setIsAdmin(false)
-      }
-    }, 3000)
-
-    const checkAdmin = async () => {
-      try {
-        const sessionPromise = supabase.auth.getSession()
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 3000)
-        )
-        let result: { data: { session: { user: { id: string; email?: string } } | null }; error: Error | null }
-        try {
-          result = await Promise.race([sessionPromise, timeoutPromise])
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : ""
-          if (msg.includes("Failed to fetch") || msg.includes("timeout") || msg.includes("Load failed")) {
-            if (mounted) {
-              adminCheckCompleted.current = true
-              setIsAdmin(false)
-              clearTimeout(loadTimeout)
-            }
-            return
-          }
-          throw err
-        }
-
-        const { data: { session }, error: sessionError } = result
-
-        if (!mounted) return
-
-        if (sessionError || !session?.user) {
-          adminCheckCompleted.current = true
-          setIsAdmin(false)
-          clearTimeout(loadTimeout)
-          return
-        }
-
-        const uid = session.user.id
-
-        const { data, error: profileError } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()
-
-        if (!mounted) return
-
-        adminCheckCompleted.current = true
-        clearTimeout(loadTimeout)
-
-        if (profileError) {
-          console.error("[v0] Profile fetch error:", profileError)
-          setError("Unable to verify permissions. Please try again.")
-          setIsAdmin(false)
-          return
-        }
-
-        if (data?.role === "admin") {
-          setIsAdmin(true)
-          loadStats()
-        } else {
-          setIsAdmin(false)
-        }
-      } catch (error) {
-        console.error("[v0] Admin dashboard error:", error)
-        if (mounted) {
-          adminCheckCompleted.current = true
-          setError("An error occurred. Please try refreshing the page.")
-          setIsAdmin(false)
-        }
-        clearTimeout(loadTimeout)
-      }
+    if (isAdmin === true) {
+      loadStats()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
-    const loadStats = async () => {
-      try {
-        const [volData, shiftData, assignData] = await Promise.all([
-          supabase.from("profiles").select("id", { count: "exact", head: true }),
-          supabase.from("shifts").select("id", { count: "exact", head: true }),
-          supabase.from("shift_assignments").select("id", { count: "exact", head: true }),
-        ])
-        if (mounted) {
-          setStats({
-            volunteers: volData.count || 0,
-            shifts: shiftData.count || 0,
-            assignments: assignData.count || 0,
-          })
-        }
-      } catch (e) {
-        console.error("[v0] Stats load error:", e)
-      }
+  const loadStats = async () => {
+    try {
+      const [volData, shiftData, assignData] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact", head: true }),
+        supabase.from("shifts").select("id", { count: "exact", head: true }),
+        supabase.from("shift_assignments").select("id", { count: "exact", head: true }),
+      ])
+      setStats({
+        volunteers: volData.count || 0,
+        shifts: shiftData.count || 0,
+        assignments: assignData.count || 0,
+      })
+    } catch (e) {
+      console.error("[v0] Stats load error:", e)
     }
-
-    checkAdmin()
-
-    return () => {
-      mounted = false
-      clearTimeout(loadTimeout)
-    }
-  }, [])
+  }
 
   if (isAdmin === false) {
     return (
