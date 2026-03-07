@@ -53,8 +53,8 @@ function DashboardContent() {
   const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserId(user?.id || null)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id || null)
     })
   }, [])
 

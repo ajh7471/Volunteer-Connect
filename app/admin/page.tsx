@@ -29,18 +29,18 @@ export default function AdminDashboard() {
 
     const checkAdmin = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
         if (!mounted) return
 
-        if (userError || !user) {
+        if (sessionError || !session?.user) {
           adminCheckCompleted.current = true
           setIsAdmin(false)
           clearTimeout(loadTimeout)
           return
         }
 
-        const uid = user.id
+        const uid = session.user.id
 
         const { data, error: profileError } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle()
 

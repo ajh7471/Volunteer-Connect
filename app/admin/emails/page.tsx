@@ -143,13 +143,13 @@ export default function AdminEmailsPage() {
     }
 
     try {
-      const { data: authUser } = await supabase.auth.getUser()
+      const { data: sessionData } = await supabase.auth.getSession()
 
       const emailPromises: Promise<EmailInsertResult>[] = selectedRecipients.map(async (recipientId: string) => {
         const volunteer = volunteers.find((v: Volunteer) => v.id === recipientId)
 
         return supabase.from("email_logs").insert({
-          sent_by: authUser.user?.id,
+          sent_by: sessionData.session?.user?.id,
           recipient_id: recipientId,
           recipient_email: volunteer?.email || "",
           email_type: emailType,

@@ -162,11 +162,11 @@ export default function AdminUsersPage() {
     }
 
     try {
-      const { data: authUser } = await supabase.auth.getUser()
+      const { data: sessionData } = await supabase.auth.getSession()
 
       const { error } = await supabase.from("auth_blocklist").insert({
         email: blockEmail.toLowerCase(),
-        blocked_by: authUser.user?.id,
+        blocked_by: sessionData.session?.user?.id,
         reason: blockReason,
       })
 

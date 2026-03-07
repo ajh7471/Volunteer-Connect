@@ -57,8 +57,8 @@ export default function MySchedulePage() {
   }, [])
 
   async function loadAssignments() {
-    const { data: userData } = await supabase.auth.getUser()
-    const uid = userData.user?.id
+    const { data: sessionData } = await supabase.auth.getSession()
+    const uid = sessionData.session?.user?.id
 
     if (!uid) {
       setLoading(false)

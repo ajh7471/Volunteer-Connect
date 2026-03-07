@@ -41,8 +41,8 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUserId(user?.id || null)
+      const { data: { session } } = await supabase.auth.getSession()
+      setUserId(session?.user?.id || null)
     }
     loadUser()
   }, [])
