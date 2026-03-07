@@ -484,6 +484,150 @@ export async function exportAttendanceCSV(
 // DASHBOARD ANALYTICS
 // =====================================================
 
+// =====================================================
+// EXTENDED DASHBOARD METRICS
+// =====================================================
+
+export type DashboardMetrics = {
+  // Volunteers
+  totalVolunteers: number
+  newVolunteersThisWeek: number
+  activeThisMonth: number
+  emailOptIns: number
+
+  // Shifts — today
+  shiftsToday: number
+  shiftsTodayFilled: number
+  shiftsTodayCapacity: number
+
+  // Shifts — upcoming 7 days
+  upcomingShifts: number
+  openSpotsNext7: number
+  fullyBookedNext7: number
+
+  // Assignments
+  totalAssignments: number
+
+  // Waitlist
+  waitlistPending: number
+
+  // Emergency coverage
+  openCoverageRequests: number
+
+  // Emails (last 30 days)
+  emailsSent30d: number
+  emailsFailed30d: number
+}
+
+export async function getDashboardMetrics(): Promise<{
+  success: boolean
+  data?: DashboardMetrics
+  error?: string
+}> {
+  try {
+    const { supabase } = await verifyAdminRole()
+
+    const now = new Date()
+    const today = now.toISOString().split("T")[0]
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - 7)
+    const weekStartStr = weekStart.toISOString().split("T")[0]
+    const next7 = new Date(now)
+    next7.setDate(now.getDate() + 7)
+    const next7Str = next7.toISOString().split("T")[0]
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+    const month30Ago = new Date(now)
+    month30Ago.setDate(now.getDate() - 30)
+    const month30Str = month30Ago.toISOString().split("T")[0]
+
+    const [
+      volunteersRes,
+      newVolRes,
+      activeMonthRes,
+      emailOptInRes,
+      assignmentsRes,
+      todayShiftsRes,
+      upcomingRes,
+      waitlistRes,
+      coverageRes,
+      emailsSentRes,
+      emailsFailedRes,
+    ] = await Promise.all([
+      // Total volunteers
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "volunteer"),
+      // New this week
+      supabase.from("profiles").select("id", { count: "exact", head: true })
+        .eq("role", "volunteer")
+        .gte("created_at", weekStartStr),
+      // Active this month (assignments)
+      supabase.from("shift_assignments")
+        .select("user_id, shifts!inner(shift_date)", { count: "exact", head: true })
+        .gte("shifts.shift_date", monthStart)
+        .lte("shifts.shift_date", today),
+      // Email opt-ins
+      supabase.from("profiles").select("id", { count: "exact", head: true })
+        .eq("email_opt_in", true),
+      // Total assignments
+      supabase.from("shift_assignments").select("id", { count: "exact", head: true }),
+      // Today's shifts fill data
+      supabase.from("shift_fill_rates")
+        .select("capacity, filled_count")
+        .eq("shift_date", today),
+      // Upcoming 7 days fill data
+      supabase.from("shift_fill_rates")
+        .select("capacity, filled_count, fill_status, spots_remaining")
+        .gte("shift_date", today)
+        .lte("shift_date", next7Str),
+      // Waitlist pending
+      supabase.from("shift_waitlist").select("id", { count: "exact", head: true })
+        .eq("status", "waiting"),
+      // Open emergency coverage requests
+      supabase.from("emergency_coverage_requests").select("id", { count: "exact", head: true })
+        .eq("status", "open"),
+      // Emails sent last 30d
+      supabase.from("email_logs").select("id", { count: "exact", head: true })
+        .eq("status", "sent")
+        .gte("sent_at", month30Str),
+      // Emails failed last 30d
+      supabase.from("email_logs").select("id", { count: "exact", head: true })
+        .eq("status", "failed")
+        .gte("sent_at", month30Str),
+    ])
+
+    const todayRows = todayShiftsRes.data || []
+    const upcomingRows = upcomingRes.data || []
+
+    return {
+      success: true,
+      data: {
+        totalVolunteers: volunteersRes.count ?? 0,
+        newVolunteersThisWeek: newVolRes.count ?? 0,
+        activeThisMonth: activeMonthRes.count ?? 0,
+        emailOptIns: emailOptInRes.count ?? 0,
+
+        shiftsToday: todayRows.length,
+        shiftsTodayFilled: todayRows.reduce((s, r) => s + Number(r.filled_count ?? 0), 0),
+        shiftsTodayCapacity: todayRows.reduce((s, r) => s + (r.capacity ?? 0), 0),
+
+        upcomingShifts: upcomingRows.length,
+        openSpotsNext7: upcomingRows.reduce((s, r) => s + Number(r.spots_remaining ?? 0), 0),
+        fullyBookedNext7: upcomingRows.filter((r) => r.fill_status === "Full").length,
+
+        totalAssignments: assignmentsRes.count ?? 0,
+        waitlistPending: waitlistRes.count ?? 0,
+        openCoverageRequests: coverageRes.count ?? 0,
+
+        emailsSent30d: emailsSentRes.count ?? 0,
+        emailsFailed30d: emailsFailedRes.count ?? 0,
+      },
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    console.error("[v0] Get dashboard metrics error:", error)
+    return { success: false, error: errorMessage }
+  }
+}
+
 /**
  * Get dashboard statistics.
  * Active-this-month count is derived from shift_assignments joined with shifts —
