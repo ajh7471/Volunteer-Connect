@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -422,166 +421,186 @@ function EditShiftSheet({
     })
   }
 
-  return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col h-full p-0">
-        <SheetHeader className="p-6 pb-4 border-b shrink-0">
-          <SheetTitle className="text-xl">
-            {SLOT_DEFAULTS[shift.slot]?.label || shift.slot} Shift
-          </SheetTitle>
-          <SheetDescription className="text-base">{displayDate}</SheetDescription>
-        </SheetHeader>
+  const capacityStatus = getCapacityStatus(shift.capacity, assigned.length)
+  const fillPct = shift.capacity > 0 ? Math.min(Math.round((assigned.length / shift.capacity) * 100), 100) : 0
 
-        <ScrollArea className="flex-1 px-6">
-          <div className="py-6 space-y-6">
-            {/* Time display */}
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/50">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <Clock className="h-6 w-6 text-primary" />
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+        {/* Header — matches ShiftModal style */}
+        <DialogHeader className="px-5 pt-5 pb-4 border-b">
+          <DialogTitle className="text-base font-semibold">
+            {SLOT_DEFAULTS[shift.slot]?.label || shift.slot} Shift
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Edit shift details, manage volunteers, or delete this shift.
+          </DialogDescription>
+          <p className="text-sm text-muted-foreground">{displayDate}</p>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[70vh]">
+          <div className="px-5 py-4 space-y-5">
+            {/* Date + time block — matches ShiftModal's info block */}
+            <div className="flex flex-col gap-2 rounded-lg border p-3 bg-muted/20">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span>{displayDate}</span>
+                <Badge
+                  variant={
+                    capacityStatus === "available" ? "default"
+                    : capacityStatus === "nearly-full" ? "secondary"
+                    : "destructive"
+                  }
+                  className="ml-auto text-xs"
+                >
+                  {capacityStatus === "available" ? "Available" : capacityStatus === "nearly-full" ? "Nearly Full" : "Full"}
+                </Badge>
               </div>
-              <div>
-                <p className="text-lg font-semibold">{fmt12(shift.start_time)} – {fmt12(shift.end_time)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {Math.max(0, parseInt(shift.end_time) - parseInt(shift.start_time))} hours
-                </p>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>{fmt12(shift.start_time)} – {fmt12(shift.end_time)} ({shift.slot})</span>
+                </div>
+                <span className="text-muted-foreground text-xs">{assigned.length}/{shift.capacity} filled</span>
               </div>
             </div>
 
-            {/* Capacity */}
-            <div className="space-y-3">
+            {/* Capacity bar + inline edit */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Capacity</Label>
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> Capacity
+                </span>
                 {!editingCapacity && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      setNewCapacity(shift.capacity.toString())
-                      setEditingCapacity(true)
-                    }}
+                    className="h-6 text-xs px-2"
+                    onClick={() => { setNewCapacity(shift.capacity.toString()); setEditingCapacity(true) }}
                   >
                     Edit
                   </Button>
                 )}
               </div>
               {editingCapacity ? (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <Input
                     type="number"
                     min={1}
                     max={50}
                     value={newCapacity}
                     onChange={(e) => setNewCapacity(e.target.value)}
-                    className="w-24 text-lg"
+                    className="w-20 h-8 text-sm"
                   />
-                  <Button onClick={handleUpdateCapacity} disabled={isPending}>
-                    Save
-                  </Button>
-                  <Button variant="ghost" onClick={() => setEditingCapacity(false)}>
-                    Cancel
-                  </Button>
+                  <Button size="sm" className="h-8 text-xs" onClick={handleUpdateCapacity} disabled={isPending}>Save</Button>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setEditingCapacity(false)}>Cancel</Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-4">
-                  <Badge
-                    className="text-base px-3 py-1"
-                    variant={
-                      assigned.length >= shift.capacity
-                        ? "destructive"
-                        : assigned.length >= shift.capacity * 0.75
-                          ? "secondary"
-                          : "default"
-                    }
-                  >
-                    {assigned.length}/{shift.capacity}
-                  </Badge>
-                  <span className="text-muted-foreground">
-                    {assigned.length} of {shift.capacity} spots filled
-                  </span>
+                <div className="space-y-1.5">
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={
+                        capacityStatus === "full" ? "h-full bg-primary rounded-full"
+                        : capacityStatus === "nearly-full" ? "h-full bg-amber-500 rounded-full"
+                        : "h-full bg-primary/50 rounded-full"
+                      }
+                      style={{ width: `${fillPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{assigned.length} of {shift.capacity} spots filled</p>
                 </div>
               )}
             </div>
 
-            {/* Assigned volunteers */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-muted-foreground" />
-                <Label className="text-base font-semibold">Assigned Volunteers ({assigned.length})</Label>
-              </div>
-              {assigned.length === 0 ? (
-                <p className="text-muted-foreground italic py-4 text-center bg-muted/30 rounded-lg">
-                  No volunteers assigned yet
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {assigned.map((a) => (
-                    <div key={a.id} className="flex items-center justify-between bg-muted/50 rounded-xl px-4 py-3 group">
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{a.profiles?.name ?? "Unknown"}</p>
-                        <p className="text-sm text-muted-foreground truncate">{a.profiles?.email ?? ""}</p>
+            {/* Volunteers list — matches ShiftModal's volunteer section */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Volunteers ({assigned.length})
+              </p>
+              <div className="rounded-lg border bg-card shadow-sm">
+                <div className="p-3 space-y-1.5 max-h-[180px] overflow-y-auto">
+                  {assigned.length === 0 ? (
+                    <p className="text-center py-3 text-sm text-muted-foreground italic">No volunteers assigned yet</p>
+                  ) : (
+                    assigned.map((a) => (
+                      <div key={a.id} className="flex items-center gap-3 text-sm group">
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+                          {(a.profiles?.name || "?")[0].toUpperCase()}
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-medium truncate">{a.profiles?.name ?? "Unknown"}</span>
+                          <span className="text-xs text-muted-foreground truncate">{a.profiles?.email ?? ""}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:text-destructive shrink-0"
+                          onClick={() => handleRemove(a.id, a.profiles?.name ?? "Volunteer")}
+                          disabled={isPending}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemove(a.id, a.profiles?.name ?? "Volunteer")}
-                        disabled={isPending}
-                        className="opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all shrink-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Assign volunteer */}
+            {/* Add volunteer */}
             {assigned.length < shift.capacity && unassigned.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5 text-muted-foreground" />
-                  <Label className="text-base font-semibold">Add Volunteer</Label>
-                </div>
-                <div className="flex gap-3">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <UserPlus className="h-3.5 w-3.5" /> Add Volunteer
+                </p>
+                <div className="flex gap-2">
                   <Select value={assigningId} onValueChange={setAssigningId}>
-                    <SelectTrigger className="flex-1">
+                    <SelectTrigger className="flex-1 h-9 text-sm">
                       <SelectValue placeholder="Select volunteer..." />
                     </SelectTrigger>
                     <SelectContent>
                       {unassigned.map((v) => (
                         <SelectItem key={v.id} value={v.id}>
                           <span className="font-medium">{v.name}</span>
-                          <span className="text-muted-foreground ml-2">{v.email}</span>
+                          <span className="text-muted-foreground ml-2 text-xs">{v.email}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button onClick={handleAssign} disabled={!assigningId || isPending} size="lg">
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
+                  <Button onClick={handleAssign} disabled={!assigningId || isPending} className="h-9 text-sm px-4">
+                    {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Add"}
                   </Button>
                 </div>
               </div>
             )}
 
             {assigned.length >= shift.capacity && (
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
-                <AlertCircle className="h-5 w-5 shrink-0" />
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>Shift is at full capacity</span>
               </div>
             )}
           </div>
         </ScrollArea>
 
-        {/* Delete button at bottom */}
-        <div className="p-6 pt-4 border-t shrink-0 bg-background">
-          <Button variant="destructive" className="w-full h-12 text-base" onClick={handleDelete} disabled={isPending}>
-            <Trash2 className="h-5 w-5 mr-2" />
-            Delete Shift
-            {assigned.length > 0 && ` (removes ${assigned.length} assignment${assigned.length > 1 ? "s" : ""})`}
+        {/* Footer — delete + close */}
+        <div className="px-5 py-3 border-t flex gap-2 bg-background">
+          <Button variant="outline" size="sm" className="flex-1 h-9 text-sm" onClick={onClose}>
+            Close
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="flex-1 h-9 text-sm"
+            onClick={handleDelete}
+            disabled={isPending}
+          >
+            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+            Delete{assigned.length > 0 ? ` (${assigned.length})` : ""}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
 
