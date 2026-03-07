@@ -708,6 +708,272 @@ function testToastWarningType() {
 }
 
 // ============================================================================
+// 25. ADMIN WEEK GRID LOGIC (new shifts page)
+// ============================================================================
+console.log("\n=== ADMIN WEEK GRID LOGIC ===")
+
+function testWeekGridBuilding() {
+  console.log("\n--- buildWeek: 7 days, Sun–Sat ---")
+  function startOfWeek(d) { const c = new Date(d); c.setDate(c.getDate() - c.getDay()); return c }
+  function addDays(d, n) { const c = new Date(d); c.setDate(c.getDate() + n); return c }
+  function toDateStr(d) { return d.toISOString().split("T")[0] }
+  function buildWeek(base) {
+    const sun = startOfWeek(base)
+    return Array.from({ length: 7 }, (_, i) => { const date = addDays(sun, i); return { date, dateStr: toDateStr(date) } })
+  }
+  const week = buildWeek(new Date(2026, 2, 18)) // Wed Mar 18 → week starts Mar 15 (Sun)
+  assertEqual(week.length, 7, "week has 7 days")
+  assertEqual(week[0].date.getDay(), 0, "week[0] is Sunday")
+  assertEqual(week[6].date.getDay(), 6, "week[6] is Saturday")
+  assertEqual(week[0].dateStr, "2026-03-15", "week starts Mar 15")
+  assertEqual(week[6].dateStr, "2026-03-21", "week ends Mar 21")
+}
+
+function testWeekGridFilling() {
+  console.log("\n--- fillWeek: shifts land on correct day+slot ---")
+  const SLOTS = ["AM", "MID", "PM"]
+  function buildWeek(base) {
+    function startOfWeek(d) { const c = new Date(d); c.setDate(c.getDate() - c.getDay()); return c }
+    function addDays(d, n) { const c = new Date(d); c.setDate(c.getDate() + n); return c }
+    function toDateStr(d) { return d.toISOString().split("T")[0] }
+    const sun = startOfWeek(base)
+    return Array.from({ length: 7 }, (_, i) => { const date = addDays(sun, i); return { date, dateStr: toDateStr(date), shifts: { AM: null, MID: null, PM: null } } })
+  }
+  function fillWeek(weekData, shifts) {
+    const map = {}
+    for (const s of shifts) { if (!map[s.shift_date]) map[s.shift_date] = []; map[s.shift_date].push(s) }
+    return weekData.map((day) => {
+      const dayShifts = map[day.dateStr] || []
+      const slotMap = { AM: null, MID: null, PM: null }
+      for (const slot of SLOTS) slotMap[slot] = dayShifts.find((s) => s.slot === slot) ?? null
+      return { ...day, shifts: slotMap }
+    })
+  }
+  const week = buildWeek(new Date(2026, 2, 18))
+  const shifts = [
+    { id: "s1", shift_date: "2026-03-16", slot: "AM", shift_assignments: [], capacity: 3, start_time: "09:00", end_time: "12:00" },
+    { id: "s2", shift_date: "2026-03-16", slot: "PM", shift_assignments: [], capacity: 3, start_time: "16:00", end_time: "20:00" },
+    { id: "s3", shift_date: "2026-03-20", slot: "MID", shift_assignments: [], capacity: 5, start_time: "12:00", end_time: "16:00" },
+  ]
+  const filled = fillWeek(week, shifts)
+  const mon = filled.find((d) => d.dateStr === "2026-03-16")
+  assert(mon !== undefined, "Monday Mar 16 found in week")
+  assert(mon.shifts.AM !== null, "Mon AM shift populated")
+  assert(mon.shifts.PM !== null, "Mon PM shift populated")
+  assert(mon.shifts.MID === null, "Mon MID slot empty")
+  assertEqual(mon.shifts.AM.id, "s1", "Mon AM = s1")
+  const fri = filled.find((d) => d.dateStr === "2026-03-20")
+  assert(fri.shifts.MID !== null, "Fri MID shift populated")
+  const sun = filled.find((d) => d.dateStr === "2026-03-15")
+  assert(sun.shifts.AM === null && sun.shifts.MID === null && sun.shifts.PM === null, "Sun all empty")
+}
+
+function testFillBadgeThresholds() {
+  console.log("\n--- FillBadge: color thresholds ---")
+  function fillColor(assigned, capacity) {
+    const full = assigned >= capacity
+    const close = !full && assigned >= capacity * 0.75
+    return full ? "red" : close ? "amber" : "green"
+  }
+  assertEqual(fillColor(0, 4), "green",  "0/4 = green")
+  assertEqual(fillColor(2, 4), "green",  "2/4 = green (50%)")
+  assertEqual(fillColor(3, 4), "amber",  "3/4 = amber (75%)")
+  assertEqual(fillColor(4, 4), "red",    "4/4 = red (full)")
+  assertEqual(fillColor(5, 4), "red",    "5/4 = red (over)")
+  assertEqual(fillColor(0, 1), "green",  "0/1 = green")
+  assertEqual(fillColor(1, 1), "red",    "1/1 = red")
+  assertEqual(fillColor(3, 3), "red",    "3/3 = red")
+}
+
+function testFmt12() {
+  console.log("\n--- fmt12: 24h→12h conversion ---")
+  function fmt12(time) {
+    if (!time) return ""
+    const [h, m] = time.split(":").map(Number)
+    const ampm = h < 12 ? "AM" : "PM"
+    const h12 = h % 12 || 12
+    return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`
+  }
+  assertEqual(fmt12("08:00"), "8:00 AM",  "08:00")
+  assertEqual(fmt12("12:00"), "12:00 PM", "noon")
+  assertEqual(fmt12("00:00"), "12:00 AM", "midnight")
+  assertEqual(fmt12("13:30"), "1:30 PM",  "13:30")
+  assertEqual(fmt12("20:00"), "8:00 PM",  "20:00")
+  assertEqual(fmt12(""),      "",          "empty string")
+}
+
+// ============================================================================
+// 26. BULK CREATE SHIFT LOGIC (server action mirrors)
+// ============================================================================
+console.log("\n=== BULK CREATE SHIFT LOGIC ===")
+
+function testBulkCreateDayFilter() {
+  console.log("\n--- bulkCreateShifts: day-of-week filter ---")
+  function countMatchingDays(startDate, endDate, daysOfWeek) {
+    let count = 0
+    const cur = new Date(startDate + "T00:00:00")
+    const end = new Date(endDate + "T00:00:00")
+    while (cur <= end) { if (daysOfWeek.includes(cur.getDay())) count++; cur.setDate(cur.getDate() + 1) }
+    return count
+  }
+  // Mon–Fri for one full week (Mar 16–20 = 5 weekdays)
+  assertEqual(countMatchingDays("2026-03-16", "2026-03-22", [1,2,3,4,5]), 5, "Mon–Fri in Mar 16–22 = 5")
+  // Weekends only (Mar 15 Sun + Mar 21 Sat = 2)
+  assertEqual(countMatchingDays("2026-03-15", "2026-03-21", [0,6]), 2, "Weekends in Mar 15–21 = 2")
+  // All days for 7 days = 7
+  assertEqual(countMatchingDays("2026-03-15", "2026-03-21", [0,1,2,3,4,5,6]), 7, "All days in 7-day range = 7")
+  // No matching days
+  assertEqual(countMatchingDays("2026-03-15", "2026-03-21", []), 0, "No days selected = 0")
+  // Single day: Mon only, range has 3 Mondays
+  assertEqual(countMatchingDays("2026-03-01", "2026-03-31", [1]), 5, "Mon only in March 2026 = 5 Mondays")
+  // Leap year Feb: Mon count for Feb 2028
+  assertEqual(countMatchingDays("2028-02-01", "2028-02-29", [1]), 5, "Feb 2028 has 5 Mondays (leap)")
+}
+
+function testBulkCreateDeduplication() {
+  console.log("\n--- bulkCreateShifts: existing shift deduplication ---")
+  function filterOutExisting(candidateDates, existingSet) {
+    return candidateDates.filter((d) => !existingSet.has(d))
+  }
+  const existing = new Set(["2026-03-16", "2026-03-17"])
+  const candidates = ["2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19"]
+  const toCreate = filterOutExisting(candidates, existing)
+  assertEqual(toCreate.length, 2, "dedup removes 2 existing dates")
+  assert(!toCreate.includes("2026-03-16"), "existing date excluded")
+  assert(!toCreate.includes("2026-03-17"), "existing date excluded")
+  assert(toCreate.includes("2026-03-18"), "new date included")
+  assert(toCreate.includes("2026-03-19"), "new date included")
+  // All existing: nothing to create
+  const allExisting = new Set(["2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19"])
+  assertEqual(filterOutExisting(candidates, allExisting).length, 0, "all existing → 0 to create")
+  // None existing: all created
+  assertEqual(filterOutExisting(candidates, new Set()).length, 4, "none existing → all 4 created")
+}
+
+function testBulkDeleteOnlyEmpty() {
+  console.log("\n--- bulkDeleteShifts: onlyEmpty guard ---")
+  function applyOnlyEmptyFilter(shiftIds, assignedShiftIds, onlyEmpty) {
+    if (!onlyEmpty) return { toDelete: shiftIds, skipped: 0 }
+    const assignedSet = new Set(assignedShiftIds)
+    const toDelete = shiftIds.filter((id) => !assignedSet.has(id))
+    return { toDelete, skipped: shiftIds.length - toDelete.length }
+  }
+  const shifts = ["s1", "s2", "s3", "s4"]
+  const assigned = ["s2", "s4"]
+  // onlyEmpty = true: skip assigned
+  const r1 = applyOnlyEmptyFilter(shifts, assigned, true)
+  assertEqual(r1.toDelete.length, 2, "onlyEmpty: 2 shifts to delete")
+  assertEqual(r1.skipped, 2, "onlyEmpty: 2 shifts skipped")
+  assert(!r1.toDelete.includes("s2"), "s2 (assigned) not deleted")
+  assert(!r1.toDelete.includes("s4"), "s4 (assigned) not deleted")
+  // onlyEmpty = false: delete all including assigned
+  const r2 = applyOnlyEmptyFilter(shifts, assigned, false)
+  assertEqual(r2.toDelete.length, 4, "not onlyEmpty: all 4 deleted")
+  assertEqual(r2.skipped, 0, "not onlyEmpty: 0 skipped")
+  // All empty: same result either way
+  const r3 = applyOnlyEmptyFilter(shifts, [], true)
+  assertEqual(r3.toDelete.length, 4, "all empty → all 4 deleted with onlyEmpty")
+}
+
+function testBulkSlotFilter() {
+  console.log("\n--- bulkDeleteShifts/updateCapacity: slot filter ---")
+  const shifts = [
+    { id: "s1", slot: "AM" }, { id: "s2", slot: "MID" }, { id: "s3", slot: "PM" }, { id: "s4", slot: "AM" },
+  ]
+  function filterBySlot(shifts, slot) {
+    if (!slot || slot === "all") return shifts
+    return shifts.filter((s) => s.slot === slot)
+  }
+  assertEqual(filterBySlot(shifts, "AM").length, 2, "slot=AM gives 2")
+  assertEqual(filterBySlot(shifts, "MID").length, 1, "slot=MID gives 1")
+  assertEqual(filterBySlot(shifts, "PM").length, 1, "slot=PM gives 1")
+  assertEqual(filterBySlot(shifts, "all").length, 4, "slot=all gives 4")
+  assertEqual(filterBySlot(shifts, undefined).length, 4, "slot=undefined gives 4")
+}
+
+// ============================================================================
+// 27. ADMIN HEADER NAV ROLE ROUTING
+// ============================================================================
+console.log("\n=== ADMIN HEADER NAV ROLE ROUTING ===")
+
+function testAdminNavLinks() {
+  console.log("\n--- Admin role sees admin nav, not volunteer nav ---")
+  function getNavLinks(role, isLoggedIn) {
+    if (!isLoggedIn) return []
+    if (role === "admin") return ["admin", "admin/shifts", "admin/volunteers", "admin/emails", "admin/reports", "profile"]
+    return ["volunteer", "calendar", "my-schedule", "profile"]
+  }
+  const adminLinks = getNavLinks("admin", true)
+  assert(adminLinks.includes("admin/shifts"), "admin sees shifts link")
+  assert(adminLinks.includes("admin/volunteers"), "admin sees volunteers link")
+  assert(adminLinks.includes("admin/emails"), "admin sees emails link")
+  assert(adminLinks.includes("admin/reports"), "admin sees reports link")
+  assert(!adminLinks.includes("calendar"), "admin does NOT see calendar")
+  assert(!adminLinks.includes("my-schedule"), "admin does NOT see my-schedule")
+  assert(!adminLinks.includes("volunteer"), "admin does NOT see volunteer dashboard")
+  const volLinks = getNavLinks("volunteer", true)
+  assert(volLinks.includes("calendar"), "volunteer sees calendar")
+  assert(volLinks.includes("my-schedule"), "volunteer sees my-schedule")
+  assert(!volLinks.includes("admin/shifts"), "volunteer does NOT see admin/shifts")
+  const loggedOut = getNavLinks(null, false)
+  assertEqual(loggedOut.length, 0, "logged out: no nav links")
+}
+
+function testSlotDefaults() {
+  console.log("\n--- SLOT_DEFAULTS: each slot has valid time range ---")
+  const SLOT_DEFAULTS = {
+    AM:  { start: "08:00", end: "12:00" },
+    MID: { start: "12:00", end: "16:00" },
+    PM:  { start: "16:00", end: "20:00" },
+  }
+  for (const [slot, times] of Object.entries(SLOT_DEFAULTS)) {
+    assert(times.start < times.end, `${slot}: start < end`)
+    assert(/^\d{2}:\d{2}$/.test(times.start), `${slot}: start format valid`)
+    assert(/^\d{2}:\d{2}$/.test(times.end), `${slot}: end format valid`)
+  }
+  assertEqual(SLOT_DEFAULTS.AM.start, "08:00",  "AM start = 08:00")
+  assertEqual(SLOT_DEFAULTS.MID.start, "12:00", "MID start = 12:00")
+  assertEqual(SLOT_DEFAULTS.PM.start, "16:00",  "PM start = 16:00")
+}
+
+function testSidePanelAssignmentFiltering() {
+  console.log("\n--- SidePanel: unassigned volunteer list excludes already-assigned ---")
+  const volunteers = [
+    { id: "v1", name: "Alice", email: "a@example.com" },
+    { id: "v2", name: "Bob",   email: "b@example.com" },
+    { id: "v3", name: "Carol", email: "c@example.com" },
+  ]
+  const assigned = [
+    { id: "a1", user_id: "v1", profiles: { id: "v1", name: "Alice", email: "a@example.com" } },
+  ]
+  const unassigned = volunteers.filter((v) => !assigned.some((a) => a.user_id === v.id))
+  assertEqual(unassigned.length, 2, "2 unassigned volunteers")
+  assert(!unassigned.some((v) => v.id === "v1"), "Alice (assigned) not in unassigned list")
+  assert(unassigned.some((v) => v.id === "v2"), "Bob in unassigned list")
+  assert(unassigned.some((v) => v.id === "v3"), "Carol in unassigned list")
+  // Full shift: no unassigned shown
+  const assignedAll = volunteers.map((v) => ({ id: "a", user_id: v.id, profiles: null }))
+  const unassignedFull = volunteers.filter((v) => !assignedAll.some((a) => a.user_id === v.id))
+  assertEqual(unassignedFull.length, 0, "full shift: 0 unassigned volunteers")
+}
+
+function testWeekNavigation() {
+  console.log("\n--- Week navigation: prev/next week ---")
+  function addDays(d, n) { const c = new Date(d); c.setDate(c.getDate() + n); return c }
+  function toDateStr(d) { return d.toISOString().split("T")[0] }
+  const base = new Date(2026, 2, 18) // Wed Mar 18
+  const nextWeek = addDays(base, 7)
+  const prevWeek = addDays(base, -7)
+  assertEqual(toDateStr(nextWeek), "2026-03-25", "next week = Mar 25")
+  assertEqual(toDateStr(prevWeek), "2026-03-11", "prev week = Mar 11")
+  // Year boundary: last week of Dec → first week of Jan
+  const dec28 = new Date(2026, 11, 28)
+  const jan4 = addDays(dec28, 7)
+  assertEqual(jan4.getFullYear(), 2027, "Dec 28 + 7 days = 2027")
+  assertEqual(jan4.getMonth(), 0, "Dec 28 + 7 days = January")
+}
+
+// ============================================================================
 // RUN ALL UNIT TESTS
 // ============================================================================
 function runAllTests() {
@@ -736,6 +1002,10 @@ function runAllTests() {
   testICSAssignmentMapping()
   testAdminCreateUserValidation(); testRoleToggleLogic(); testAdminLastAdminProtection(); testAdminSelfDeleteProtection()
   testLoginErrorMessages()
+  // Section 25–27: new admin workflow unit tests
+  testWeekGridBuilding(); testWeekGridFilling(); testFillBadgeThresholds(); testFmt12()
+  testBulkCreateDayFilter(); testBulkCreateDeduplication(); testBulkDeleteOnlyEmpty(); testBulkSlotFilter()
+  testAdminNavLinks(); testSlotDefaults(); testSidePanelAssignmentFiltering(); testWeekNavigation()
 
   console.log("\n" + "=".repeat(60))
   console.log(`UNIT TEST RESULTS: ${passed} passed, ${failed} failed, ${passed+failed} total`)
