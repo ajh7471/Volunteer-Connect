@@ -147,3 +147,33 @@ Client files: `lib/supabase/{client,server,admin,config}.ts` + legacy `lib/supab
 - `.env.local` configured for staging (URL, anon, service_role, DATABASE_URL) and verified: REST 200 (anon + service_role), direct DB connect OK (Postgres 17.6). `.env*` is git-ignored.
 - Pre-existing change from setup (before Phase 0 instruction): `pg` + `@types/pg` added as devDependencies (used to replay scripts against staging). Flagging so it's not mistaken for Phase 0 scope creep — remove if you want the manifest untouched.
 - A throwaway script `_vh_phase0_runner.mjs` was used to replay SQL and then deleted (not committed).
+
+---
+
+## 6. SQL Provenance (added 2026-05-29)
+
+### Origin of the schema
+- **Scripts `001`–`007` were never committed to this repo.** The README documents `001_initial_schema.sql` ("Core tables"), but a full git-history search (282 commits, all branches) shows it never existed. The base tables (`profiles`, `shifts`, `shift_assignments`, …) were created **externally by the v0.dev platform / Supabase dashboard**, never synced to GitHub.
+- The repo's committed scripts begin at `008` and assume those base tables already exist. Replaying them alone against a fresh DB yields **0 tables** (see Blocker B1).
+
+### `000_baseline_schema.sql` — how it was produced
+- **Reconstructed from the live production project on 2026-05-29**, under a one-time, owner-approved, **read-only, structure-only** exception to the production hard-rule. The global prod-deny guard (PreToolUse hook + auto-mode `hard_deny`) was temporarily lifted for this single task and **restored immediately after** (verified re-armed).
+- Method: read-only catalog introspection via the authenticated Supabase MCP (`pg_get_constraintdef`, `pg_get_indexdef`, `pg_get_triggerdef`, `pg_get_functiondef`, `pg_policies`, `pg_get_viewdef`). **No row data was read or exported** — verified: 0 `COPY`, 0 top-level `INSERT`, 0 seeded data rows. (`db dump`/`pg_dump` were not usable — only API keys were available, not the prod DB password.)
+- Captures: **20 tables, 1 enum (`email_status`), 1 view (`shift_fill_rates`), 68 constraints, 40 indexes, RLS enabled on all 20 tables, 43 policies, 24 app functions, 6 triggers** — including the Supabase `auth.users` trigger `on_auth_user_created → handle_new_user()`. Extensions: `citext`, `pgcrypto`, `uuid-ossp`. citext-extension internal functions are intentionally excluded (created by `CREATE EXTENSION`).
+
+### Staging apply result
+- Applying `000_baseline_schema.sql` to staging produced **20 tables, an exact match to production's 20-table list.** ✅
+- Re-running `008`–`030` on top is **redundant and conflicts** (policy/function "already exists", missing `shift_swap_requests`), because the baseline already encodes the cumulative end-state of all prior migrations. **Resolution: `000_baseline` supersedes `001`–`007` AND the cumulative effect of `008`–`030`.** Treat `000_baseline` as the canonical schema going forward; the numbered scripts remain only as historical record.
+- Side effect: mock-data scripts `008`/`009` inserted test rows into **staging** (sandbox; harmless).
+
+### Superseded / stale scripts still present (NOT deleted — per instruction)
+- `008_mock_data.sql` ⟶ superseded by `009_corrected_mock_data.sql`.
+- Admin-role retry series: `024 → 025 → 026 → 027_set_admin_role_final → 028_bypass_rls_set_admin → 030_disable_trigger_set_admin` (iterative attempts at one task).
+- `fix_volunteer_visibility_rls.sql` — unnumbered, out-of-sequence RLS patch.
+- Deleted-in-history (informational): `007_day_roster_and_seed.sql`, `008_comprehensive_mock_data.sql`, `security_rls_fixes.sql` (the last created `auth_rate_limits` + `security_audit_log`, which **exist in prod** and are in the baseline, but the script is gone from the repo).
+
+### Uncertainties / caveats (flagged, not assumed)
+- The baseline is a **catalog reconstruction, not a literal `pg_dump`**. It omits: object ownership/grants, comments, and any objects outside `public` except the one `auth.users` trigger. Cross-checked by table count (20 = 20) and a clean apply, but not byte-identical to a `pg_dump`.
+- `get_active_volunteers()` references a `volunteer_attendance` relation that **does not exist in prod** — carried over as-is (function body isn't validated at create time). Likely a latent bug in prod; flag for Phase 1.
+- `types/database.ts` lists `WaitlistEntry` but the real table is `shift_waitlist`; reporting view is `shift_fill_rates` (plural). Use the baseline names.
+- Recommend regenerating `types/database.ts` from staging (now that it has the schema) before Phase 1.
