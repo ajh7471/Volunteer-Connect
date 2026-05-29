@@ -177,3 +177,24 @@ Client files: `lib/supabase/{client,server,admin,config}.ts` + legacy `lib/supab
 - `get_active_volunteers()` references a `volunteer_attendance` relation that **does not exist in prod** — carried over as-is (function body isn't validated at create time). Likely a latent bug in prod; flag for Phase 1.
 - `types/database.ts` lists `WaitlistEntry` but the real table is `shift_waitlist`; reporting view is `shift_fill_rates` (plural). Use the baseline names.
 - Recommend regenerating `types/database.ts` from staging (now that it has the schema) before Phase 1.
+
+---
+
+## 7. Finalizer outcomes (2026-05-29)
+
+### Canonical pg_dump verification
+- A canonical `pg_dump --schema-only` of prod was produced (by the owner, PG18 client) and structurally diffed against `000_baseline_schema.sql`.
+- **Public schema matches exactly:** tables 20=20, functions 24=24, policies 43=43, triggers 6=6 (incl. `on_auth_user_created`), enum `email_status`, view `shift_fill_rates`, constraints 68=68, non-constraint indexes 40=40. **Diff empty.**
+- The dump was a FULL-database dump (no `--schema public`), so it also carried Supabase-managed `auth`/`storage`/`realtime`/`vault` schemas. We did **NOT** adopt it as the baseline (committing those internals would clobber Supabase on a fresh project). `000_baseline_schema.sql` stays canonical — now **verified** against the authoritative dump. The temp dump lives at a local non-repo path and can be deleted.
+
+### Staging drift removed (staging now == prod, object-level)
+Re-running `008`–`030` on staging had introduced objects prod lacks. Dropped:
+- View `public.volunteer_attendance` (created by `015`; prod only has `shift_fill_rates`).
+- Event trigger `ensure_rls` + function `public.rls_auto_enable()` (an auto-RLS-on-new-tables helper from a repo RLS script; **prod does not have it**).
+- Post-cleanup staging inventory: 20 tables / 1 view / 24 functions / 43 policies / 6 table-triggers / 6 event-triggers (Supabase defaults) — **identical to prod.**
+- NOTE for Phase 1: the repo's auto-RLS event trigger (`rls_auto_enable`) is a real repo-vs-prod divergence. It would auto-enable RLS on any new `public` table — relevant when Phase 1 adds the `organizations`/`org_settings` tables. Decide intentionally whether to include it.
+
+### Phase 0 acceptance criteria — now all confirmed
+- App boots against staging: `next dev` ready ~6s; `/` (login page) = **HTTP 200**, title "Volunteer Hub - Vanderpump Dogs".
+- Login UI renders (headless check): Email + Password fields, Sign In button, Forgot-password / Create-account links. No console errors (only 2 benign `<Image>` warnings).
+- Test suite baseline: `pnpm test` (`vitest run`) → **0 passed / 0 failed — "No test files found", exit 1.** Root cause = `vitest.config.ts` `ROOT="/"` (Blocker B2); 5 test files exist but aren't discovered. NOT fixed (out of Phase 0 scope). **Must fix before Phase 2** (the RLS isolation test is a release blocker there).
