@@ -198,3 +198,12 @@ Re-running `008`–`030` on staging had introduced objects prod lacks. Dropped:
 - App boots against staging: `next dev` ready ~6s; `/` (login page) = **HTTP 200**, title "Volunteer Hub - Vanderpump Dogs".
 - Login UI renders (headless check): Email + Password fields, Sign In button, Forgot-password / Create-account links. No console errors (only 2 benign `<Image>` warnings).
 - Test suite baseline: `pnpm test` (`vitest run`) → **0 passed / 0 failed — "No test files found", exit 1.** Root cause = `vitest.config.ts` `ROOT="/"` (Blocker B2); 5 test files exist but aren't discovered. NOT fixed (out of Phase 0 scope). **Must fix before Phase 2** (the RLS isolation test is a release blocker there).
+
+---
+
+## 8. Decisions locked for Phase 1 (owner, 2026-05-29)
+
+1. **Script numbering: new multitenancy scripts start at `031`.** `029`/`030` are already taken (`029_check_triggers.sql`, `030_disable_trigger_set_admin.sql`). The Spec's `029_multitenancy_core` / `030_rls_tenant_isolation` / `031_org_offboarding` shift to **`031` / `032` / `033`**.
+2. **Do NOT add the auto-RLS event trigger (`ensure_rls` / `rls_auto_enable`) to the build.** Rationale: it auto-enables RLS on any new `public` table, which would (a) fire on `organizations`/`org_settings` at unexpected moments and (b) mask whether the explicit policies are actually correct — a table could look secure because the trigger locked it, not because the policy works. Multi-tenancy RLS must be **explicit and test-proven per table** (Phase 2 isolation test). Prod doesn't have this trigger; keep it that way. (Already removed from staging.)
+3. **`vitest.config.ts` (B2) fix = Phase 1 Step 0**, before any tenancy work, so the isolation test can run.
+4. **Keep `types/database.ts` hand-written; defer the generated-types migration.** Converting the app from flat interfaces (`Profile`, `Shift`) to the generated `Database` shape is a repo-wide refactor with no multi-tenancy value. Write Phase 1 code against the existing hand-written types and extend them as needed; keep `types/database.generated.ts` as reference only. Revisit post-launch, if ever.
