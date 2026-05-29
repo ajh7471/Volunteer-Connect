@@ -25,3 +25,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# planning docs & agent tooling (not part of the app)
+Spec.md
+SPEC.md
+Claude-Code-Setup-Guide*.md
+.agents/
+skills-lock.json
