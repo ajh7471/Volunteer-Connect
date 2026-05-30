@@ -1,7 +1,11 @@
 import { defineConfig } from "vitest/config"
 import path from "path"
+import { fileURLToPath } from "url"
 
-const ROOT = "/"
+// Project root = the directory this config file lives in.
+// Previously hardcoded to "/", which on Windows resolves to drive root C:/, so
+// vitest searched C:/__tests__ and discovered 0 test files (MIGRATION_NOTES B2).
+const ROOT = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   root: ROOT,
@@ -20,8 +24,8 @@ export default defineConfig({
     },
     // Reset modules between test files so the config singleton cache is cleared
     isolate: true,
-    setupFiles: ["/__tests__/setup.ts"],
-    include: ["/__tests__/**/*.{test,spec}.{ts,tsx}"],
+    setupFiles: ["./__tests__/setup.ts"],
+    include: ["__tests__/**/*.{test,spec}.{ts,tsx}"],
     exclude: ["**/node_modules/**", "**/.next/**", "**/dist/**", "**/scripts/**"],
     coverage: {
       provider: "v8",
