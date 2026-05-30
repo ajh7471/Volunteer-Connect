@@ -207,3 +207,43 @@ Re-running `008`–`030` on staging had introduced objects prod lacks. Dropped:
 2. **Do NOT add the auto-RLS event trigger (`ensure_rls` / `rls_auto_enable`) to the build.** Rationale: it auto-enables RLS on any new `public` table, which would (a) fire on `organizations`/`org_settings` at unexpected moments and (b) mask whether the explicit policies are actually correct — a table could look secure because the trigger locked it, not because the policy works. Multi-tenancy RLS must be **explicit and test-proven per table** (Phase 2 isolation test). Prod doesn't have this trigger; keep it that way. (Already removed from staging.)
 3. **`vitest.config.ts` (B2) fix = Phase 1 Step 0**, before any tenancy work, so the isolation test can run.
 4. **Keep `types/database.ts` hand-written; defer the generated-types migration.** Converting the app from flat interfaces (`Profile`, `Shift`) to the generated `Database` shape is a repo-wide refactor with no multi-tenancy value. Write Phase 1 code against the existing hand-written types and extend them as needed; keep `types/database.generated.ts` as reference only. Revisit post-launch, if ever.
+
+---
+
+## 9. Phase 1 progress log
+
+### Step 0 — vitest harness fixed; test baseline accepted (2026-05-29)
+- **Blocker B2 fixed.** `vitest.config.ts` `ROOT` now derives from the config file's own directory (`path.dirname(fileURLToPath(import.meta.url))`) instead of the hardcoded `"/"` that resolved to `C:/` on Windows. `setupFiles` / `include` globs made root-relative. All 5 test files are now discovered and executed.
+- **Accepted baseline: 134 / 138 tests passing** across 5 files (4 files green, 1 file with 4 failures). Owner accepted the 134/138 baseline on 2026-05-29.
+
+#### Known pre-existing test failures — DEFERRED, do NOT fix on the Phase 1 critical path (owner decision 2026-05-29, "option B")
+All 4 live in `__tests__/admin/workflows.integration.test.ts` and ran for the first time only after B2 was fixed (they were never executing before — so these are pre-existing latent issues, not regressions from the config change). The harness itself works; these do **not** block the Phase 2 RLS isolation test from being discovered/run.
+
+| # | Test | Symptom | Diagnosis (category) |
+|---|---|---|---|
+| 1 | Flow 4 — blocked email enforcement | `result.success` was true, expected false | Integration in-memory mock doesn't wire `auth_blocklist` the way `actions.ts` queries it. The same guard **passes** in standalone `actions.test.ts`. → integration-mock fidelity, not a product bug. |
+| 2 | Flow 5 — last-admin protection | `result.success` was true, expected false | Same pattern: the last-admin guard **passes** in standalone `actions.test.ts`; the integration mock's `profiles` count doesn't reflect it. → integration-mock fidelity. |
+| 3 | Flow 1 — revoke re-opens shift | `db.assignments` length 2, expected 1 | Integration in-memory `db` mock doesn't reflect the delete performed by `revokeShiftFromUser`. → integration-mock fidelity. |
+| 4 | Flow 9 — reporting period date math | got `0.9940476…` (= 167/168), expected `1` | DST spring-forward week: assertion does local-time `setDate(+7)` then divides elapsed ms by a fixed 168h. → DST-naive assertion bug in the test, not product code. |
+
+**Resolution path (later, dedicated test-hardening pass — NOT started):** align the 3 integration-mock fixtures with the standalone unit-test mocks; make the Flow 9 assertion DST-aware (compare calendar dates, not raw milliseconds).
+
+### Step 2 — multitenancy core applied + verified on staging (2026-05-29)
+`scripts/031_multitenancy_core.sql` built and applied on a **clean rebuild** (reset → `000_baseline_schema.sql` alone → `031`) on staging `tgioxwjxxppjsjernhvt`. All schema checks + the Trap-2 function patches passed end-to-end. Classification built as approved:
+
+- **TENANT, `org_id NOT NULL` (15):** profiles, shifts, shift_assignments, shift_templates, shift_waitlist, emergency_coverage_requests, email_logs, email_templates, scheduled_emails, notification_queue, notification_preferences, calendar_exports, email_service_config, user_sessions, **auth_blocklist** (PK widened `(email)` → `(org_id, email)`).
+- **TENANT, `org_id` NULLABLE (3):** pwa_installations, security_audit_log, session_events (system / pre-auth / anonymous rows have no org).
+- **GLOBAL, no `org_id` (2):** auth_rate_limits, session_config.
+- **Trap 1 unique keys re-scoped:** `shifts (org_id, shift_date, slot)` (replaced the named constraint AND the duplicate `ux_shifts_date_slot` index), `shift_templates (org_id, name)`, `email_service_config (org_id, service_name)`, `shift_assignments (org_id, shift_id, user_id)`, `shift_waitlist (org_id, shift_id, user_id)`. `profiles` PK and `notification_preferences UNIQUE(user_id)` left as-is (one-user-one-org).
+- **Trap 2 functions patched + proven end-to-end (rolled-back txns):** `handle_new_user` (profile gets org_id, default anchor), `create_notification_preferences` (inherits NEW.org_id), `schedule_shift_reminder` (notification_queue gets org_id), `process_waitlist`, `apply_shift_template` (+ ON CONFLICT `(org_id, shift_date, slot)`), `seed_shifts_range`, `handle_new_user_disabled` (dormant). Tests T1/T2/T3 all PASS, zero NOT NULL violations.
+- `types/database.generated.ts` regenerated from staging (reference only; hand-written `types/database.ts` untouched per decision #4).
+- Apply+verify ran via a throwaway harness `scripts/_phase1_apply_verify.mjs` (fail-closed staging guard) — **deleted, not committed** (same pattern as the Phase 0 runner).
+- **Backfill note:** clean rebuild = empty tables, so "attribute Vanderpump data to …0001" was vacuous here; the function tests prove the org_id-population mechanism for new rows. The real row backfill happens in **Phase 9** when `031` runs on prod. **Recommend a data-backfill rehearsal** (seed mock data, then apply `031`) before the Phase 9 cutover.
+
+### 🔴 Phase 2 MUST-FIX — cross-tenant RLS leaks in the baseline policies (flagged 2026-05-29)
+The baseline RLS policies are **single-tenant** and will leak across orgs until Phase 2 rewrites them with `auth_org_id()`. Highest priority:
+
+- **`security_audit_log`** — policy `audit_log_admin_read` is `FOR SELECT USING (profiles.role = 'admin')`, i.e. **any admin reads ALL orgs' audit rows**. Phase 2 MUST org-scope this (or lock it to service-role). *(Per owner instruction 2026-05-29.)*
+- **`auth_blocklist`** — `blocklist_admin_only` (`USING is_admin()`) spans all orgs; org-scope it in Phase 2. The pre-auth trigger `block_blocklisted_auth_users()` still does a bare `email` lookup with no org context — its redesign is **deferred to Phase 5** (signup flow) per owner ruling.
+- **General pattern:** every baseline policy that uses `is_admin()` or `USING (true)` (e.g. `email_logs_admin_only`, `notification_queue_admin_only`, `scheduled_emails_admin_only`, `shifts_read USING(true)`, `"Public profiles are viewable by everyone" USING(true)`, `"Shift assignments are viewable by everyone" USING(true)`, `shift_templates_read`, etc.) is tenant-blind today and must be replaced with `org_id = auth_org_id()` predicates in Phase 2 (`scripts/032_rls_tenant_isolation.sql`). The Phase 2 isolation test is the gate that proves these are fixed.
+- **`email_service_config`** holds provider secrets (SendGrid/Gmail keys) — its Phase 2 policy must be especially tight (org-scoped, ideally admin-or-service-role only).
