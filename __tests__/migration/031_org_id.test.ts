@@ -176,4 +176,51 @@ run("031 multitenancy migration invariants (staging)", () => {
     expect(crossOrgOk).toBe(true)
     expect(sameOrgRejected).toBe(true)
   }, 15000)
+
+  // ===== 031a backstop triggers: inserts that OMIT org_id auto-fill it =====
+  // Mirrors how real app code inserts (the cases above always set org_id explicitly,
+  // which masked the NOT NULL regression Codex PR #36 flagged).
+
+  it("backstop (shift-derived): shift_assignments insert WITHOUT org_id inherits the shift's org_id", async () => {
+    await client.query("begin")
+    const uid = await authUser("mig-bk-shift@example.com")
+    const sid = (await client.query(
+      `insert into public.shifts (shift_date, slot, start_time, end_time, capacity, org_id)
+       values (current_date + 80, 'AM', '09:00', '12:00', 5, $1) returning id`, [ANCHOR],
+    )).rows[0].id
+    // omit org_id, exactly like lib/shifts.ts signUpForShift / admin assign actions
+    const r = (await client.query(
+      `insert into public.shift_assignments (shift_id, user_id) values ($1, $2) returning org_id::text as org_id`, [sid, uid],
+    )).rows
+    await client.query("rollback")
+    expect(r.length).toBe(1)
+    expect(r[0].org_id).toBe(ANCHOR)
+  }, 15000)
+
+  it("backstop (user-derived): notification_queue insert WITHOUT org_id inherits the user's org_id", async () => {
+    await client.query("begin")
+    const uid = await authUser("mig-bk-user@example.com")
+    const r = (await client.query(
+      `insert into public.notification_queue (user_id, notification_type, subject, body, scheduled_for)
+       values ($1, 'test', 's', 'b', now()) returning org_id::text as org_id`, [uid],
+    )).rows
+    await client.query("rollback")
+    expect(r.length).toBe(1)
+    expect(r[0].org_id).toBe(ANCHOR)
+  }, 15000)
+
+  it("backstop (actor-derived): email_templates insert WITHOUT org_id inherits the acting user's org_id", async () => {
+    await client.query("begin")
+    const uid = await authUser("mig-bk-actor@example.com")
+    // simulate an authenticated session so auth.uid() resolves (the session-client path)
+    await client.query(`select set_config('request.jwt.claim.sub', $1::text, true)`, [uid])
+    await client.query(`select set_config('request.jwt.claims', json_build_object('sub', $1::text)::text, true)`, [uid])
+    const r = (await client.query(
+      `insert into public.email_templates (name, category, subject, body)
+       values ('backstop tmpl', 'reminder', 's', 'b') returning org_id::text as org_id`,
+    )).rows
+    await client.query("rollback")
+    expect(r.length).toBe(1)
+    expect(r[0].org_id).toBe(ANCHOR)
+  }, 15000)
 })
