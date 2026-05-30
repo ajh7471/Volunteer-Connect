@@ -159,7 +159,7 @@ create index if not exists idx_user_sessions_org on public.user_sessions(org_id)
 alter table public.auth_blocklist add column if not exists org_id uuid references public.organizations(id) on delete cascade;
 update public.auth_blocklist set org_id = '00000000-0000-0000-0000-000000000001' where org_id is null;
 alter table public.auth_blocklist alter column org_id set not null;
-alter table public.auth_blocklist drop constraint auth_blocklist_pkey;
+alter table public.auth_blocklist drop constraint if exists auth_blocklist_pkey;
 alter table public.auth_blocklist add constraint auth_blocklist_pkey primary key (org_id, email);
 create index if not exists idx_auth_blocklist_org on public.auth_blocklist(org_id);
 
@@ -213,8 +213,10 @@ alter table public.shift_waitlist add constraint shift_waitlist_org_shift_user_k
 -- Each derives org_id from its source row; signup paths fall back to the anchor
 -- until the Phase 5 self-service signup flow supplies the real org_id.
 
--- handle_new_user(): on_auth_user_created -> profiles (LIVE). org_id from
--- signup metadata if present, else anchor.
+-- handle_new_user(): on_auth_user_created -> profiles (LIVE). org_id is ALWAYS
+-- the anchor org here; it NEVER reads client-supplied signup metadata (doing so
+-- was a cross-tenant placement vector — ultrareview #1). Phase 5 server-side
+-- provisioning sets the real org_id from a trusted subdomain signal post-signup.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -232,7 +234,7 @@ BEGIN
     COALESCE(new.raw_user_meta_data -> 'email_categories', '{}'::jsonb),
     'volunteer',
     true,
-    COALESCE((new.raw_user_meta_data ->> 'org_id')::uuid, '00000000-0000-0000-0000-000000000001')
+    '00000000-0000-0000-0000-000000000001'  -- anchor only; never trust client metadata org_id
   )
   ON CONFLICT (id) DO UPDATE SET
     name = COALESCE(EXCLUDED.name, profiles.name),
@@ -249,6 +251,7 @@ CREATE OR REPLACE FUNCTION public.create_notification_preferences()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path TO 'public'
 AS $function$
 BEGIN
   INSERT INTO notification_preferences (user_id, org_id)
@@ -264,6 +267,7 @@ CREATE OR REPLACE FUNCTION public.schedule_shift_reminder()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_user_id UUID;
@@ -295,6 +299,7 @@ CREATE OR REPLACE FUNCTION public.process_waitlist(shift_id_param uuid)
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path TO 'public'
 AS $function$
 DECLARE
   waitlist_record RECORD;
@@ -333,6 +338,7 @@ CREATE OR REPLACE FUNCTION public.apply_shift_template(template_id_param uuid, s
  RETURNS TABLE(shifts_created integer)
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path TO 'public'
 AS $function$
 DECLARE
   template_record RECORD;
@@ -366,6 +372,7 @@ CREATE OR REPLACE FUNCTION public.seed_shifts_range(start_date date, end_date da
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_org_id uuid;
@@ -419,7 +426,7 @@ BEGIN
   user_email := COALESCE(NEW.email, '');
   user_email_opt_in := COALESCE((NEW.raw_user_meta_data->>'email_opt_in')::boolean, false);
   user_email_categories := COALESCE(NEW.raw_user_meta_data->'email_categories', '{}'::jsonb);
-  v_org_id := COALESCE((NEW.raw_user_meta_data->>'org_id')::uuid, '00000000-0000-0000-0000-000000000001');
+  v_org_id := '00000000-0000-0000-0000-000000000001';  -- anchor only; never trust client metadata org_id
 
   INSERT INTO public.profiles (
     id, name, email, phone, role, email_opt_in, email_categories, active, created_at, updated_at, org_id
